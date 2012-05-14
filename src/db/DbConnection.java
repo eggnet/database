@@ -214,7 +214,7 @@ public abstract class DbConnection {
 			String sql = "SELECT commit_id, file_id from changes natural join commits where " +
 					"(branch_id=? or branch_id is NULL) and commit_date <" + inclusiveStr + 
 					"(select commit_date from commits where commit_id=? and " +
-					"(branch_id=? OR branch_id is NULL)) ORDER BY commit_date";
+					"(branch_id=? OR branch_id is NULL) limit 1) ORDER BY commit_date";
 			if (!ascending)
 				sql += " desc";
 			String[] params = {this.branchID, commitID, this.branchID};
@@ -268,7 +268,7 @@ public abstract class DbConnection {
 			String sql = "SELECT commit_id, author, author_email, comments, commit_date, branch_id, file_id, change_type from changes natural join commits where " +
 					"(branch_id=? or branch_id is NULL) and commit_date <" + inclusiveStr + 
 					"(select commit_date from commits where commit_id=? and " +
-					"(branch_id=? OR branch_id is NULL)) ORDER BY commit_date";
+					"(branch_id=? OR branch_id is NULL) limit 1) ORDER BY commit_date";
 			if (!ascending)
 				sql += " desc";
 			String[] params = {this.branchID, commitID, this.branchID};
@@ -323,9 +323,9 @@ public abstract class DbConnection {
 			String sql = "SELECT commit_id, file_id from changes natural join commits where " +
 					"(branch_id=? or branch_id is NULL) and commit_date <" + inclusiveStr + 
 					"(select commit_date from commits where commit_id=? and " +
-					"(branch_id=? OR branch_id is NULL)) and commit_date >" + inclusiveStr + 
+					"(branch_id=? OR branch_id is NULL) limit 1) and commit_date >" + inclusiveStr + 
 					"(select commit_date from commits where commit_id=? and " +
-					"(branch_id=? or branch_id is NULL)) ORDER BY commit_date";
+					"(branch_id=? or branch_id is NULL) limit 1) ORDER BY commit_date";
 			if (!ascending)
 				sql += " desc";
 			
@@ -381,9 +381,9 @@ public abstract class DbConnection {
 			String sql = "SELECT commit_id, author, author_email, comments, commit_date, branch_id, file_id, change_type from changes natural join commits where " +
 					"(branch_id=? or branch_id is NULL) and commit_date <" + inclusiveStr + 
 					"(select commit_date from commits where commit_id=? and " +
-					"(branch_id=? OR branch_id is NULL)) and commit_date >" + inclusiveStr +
+					"(branch_id=? OR branch_id is NULL) limit 1) and commit_date >" + inclusiveStr +
 					"(select commit_date from commits where commit_id=? and " +
-					"(branch_id=? or branch_id is NULL)) ORDER BY commit_date";
+					"(branch_id=? or branch_id is NULL) limit 1) ORDER BY commit_date";
 			if (!ascending)
 				sql += " desc";
 			
@@ -595,7 +595,7 @@ public abstract class DbConnection {
 		try {
 			// get the last commit that changed the file
 			String sql = "SELECT commit_id from changes natural join commits where commit_date < " +
-					"(SELECT commit_date from commits where commit_id=?)" +
+					"(SELECT commit_date from commits where commit_id=? limit 1)" +
 					" and file_id=? order by commit_date desc limit 1;";
 			String[] parms = {CommitId, fileId};
 			ResultSet rs = execPreparedQuery(sql, parms);
