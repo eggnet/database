@@ -623,12 +623,12 @@ public abstract class DbConnection {
 		try
 		{
 			String sql = "SELECT commit_id, author, author_email, comments, commit_date, branch_id FROM Commits where commit_id=? and (branch_id=? or branch_id is NULL);";
-			String[] parms = {CommitId};
+			String[] parms = {CommitId, this.branchID};
 			ResultSet rs = execPreparedQuery(sql, parms);
 			if (!rs.next())
 				return null;
 			else
-				return new Commit(rs.getInt(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5), rs.getTimestamp(6), rs.getString(7));
+				return new Commit(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getTimestamp(5), rs.getString(6));
 		}
 		catch (SQLException e)
 		{
