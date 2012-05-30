@@ -43,4 +43,21 @@ public abstract class Resources {
 		
 		return lineCount;
 	}
+	
+	public static int convertLineStartToCharStart(int lineStart, String file) {
+		int index = -1;
+		int lineCount = 1;
+		
+		for(char c: file.toCharArray()) {
+			if(c == '\n')
+				lineCount++;
+			else if(lineCount == lineStart) {
+				index++;
+				break;
+			}
+			index++;
+		}
+		
+		return index;
+	}
 }
