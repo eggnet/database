@@ -221,7 +221,7 @@ public abstract class DbConnection {
 			String sql = "SELECT commit_id, file_id from changes natural join commits where " +
 					"(branch_id=? or branch_id is NULL) and commit_date <" + inclusiveStr + 
 					"(select commit_date from commits where commit_id=? and " +
-					"(branch_id=? OR branch_id is NULL) limit 1) ORDER BY commit_date";
+					"(branch_id=? OR branch_id is NULL) limit 1) ORDER BY id";
 			if (!ascending)
 				sql += " desc";
 			String[] params = {this.branchID, commitID, this.branchID};
@@ -275,7 +275,7 @@ public abstract class DbConnection {
 			String sql = "SELECT commit_id, author, author_email, comments, commit_date, branch_id, file_id, change_type from changes natural join commits where " +
 					"(branch_id=? or branch_id is NULL) and commit_date <" + inclusiveStr + 
 					"(select commit_date from commits where commit_id=? and " +
-					"(branch_id=? OR branch_id is NULL) limit 1) ORDER BY commit_date";
+					"(branch_id=? OR branch_id is NULL) limit 1) ORDER BY id";
 			if (!ascending)
 				sql += " desc";
 			String[] params = {this.branchID, commitID, this.branchID};
@@ -332,7 +332,7 @@ public abstract class DbConnection {
 					"(select commit_date from commits where commit_id=? and " +
 					"(branch_id=? OR branch_id is NULL) limit 1) and commit_date >" + inclusiveStr + 
 					"(select commit_date from commits where commit_id=? and " +
-					"(branch_id=? or branch_id is NULL) limit 1) ORDER BY commit_date";
+					"(branch_id=? or branch_id is NULL) limit 1) ORDER BY id";
 			if (!ascending)
 				sql += " desc";
 			
@@ -390,7 +390,7 @@ public abstract class DbConnection {
 					"(select commit_date from commits where commit_id=? and " +
 					"(branch_id=? OR branch_id is NULL) limit 1) and commit_date >" + inclusiveStr +
 					"(select commit_date from commits where commit_id=? and " +
-					"(branch_id=? or branch_id is NULL) limit 1) ORDER BY commit_date";
+					"(branch_id=? or branch_id is NULL) limit 1) ORDER BY id";
 			if (!ascending)
 				sql += " desc";
 			
@@ -554,7 +554,7 @@ public abstract class DbConnection {
 	{
 		try 
 		{
-			String sql = "Select commit_id from owners natural join commits order by commit_date desc;";
+			String sql = "Select commit_id from owners natural join commits order by id desc;";
 			String[] parms = {};
 			ResultSet rs = execPreparedQuery(sql, parms);
 			if (rs.next())
@@ -576,7 +576,7 @@ public abstract class DbConnection {
 	{
 		try 
 		{
-			String sql = "Select commit_id from commits order by commit_date desc;";
+			String sql = "Select commit_id from commits order by id desc;";
 			String[] parms = {};
 			ResultSet rs = execPreparedQuery(sql, parms);
 			if (rs.next())
@@ -603,7 +603,7 @@ public abstract class DbConnection {
 			// get the last commit that changed the file
 			String sql = "SELECT commit_id from changes natural join commits where commit_date < " +
 					"(SELECT commit_date from commits where commit_id=? limit 1)" +
-					" and file_id=? order by commit_date desc limit 1;";
+					" and file_id=? order by id desc limit 1;";
 			String[] parms = {CommitId, fileId};
 			ResultSet rs = execPreparedQuery(sql, parms);
 			if (!rs.next())
@@ -667,7 +667,7 @@ public abstract class DbConnection {
 		try 
 		{
 			String sql = "SELECT commit_id, file_id, owner_id, line_start, line_end, change_type FROM owners natural join commits where file_id=? and commit_id=?" +
-					"and line_start='" + CharStart + "' and (branch_id=? OR branch_id is NULL) and commit_date < "+ CommitDate + " order by commit_date desc";
+					"and line_start='" + CharStart + "' and (branch_id=? OR branch_id is NULL) and commit_date < "+ CommitDate + " order by id desc";
 			String[] parms = {FileId, branchID};
 			ResultSet rs = execPreparedQuery(sql, parms);
 			if (!rs.next())
@@ -687,7 +687,7 @@ public abstract class DbConnection {
 		try
 		{
 			String sql = "SELECT commit_id, file_id, owner_id, line_start, line_end, change_type FROM owners natural join commits where file_id=? AND commit_date < ? AND "
-					+ "(branch_id=? OR branch_id is NULL) order by commit_date desc";
+					+ "(branch_id=? OR branch_id is NULL) order by id desc";
 			PreparedStatement stmt = conn.prepareStatement(sql);
 			stmt.setString(1, fileId);
 			stmt.setTimestamp(2, commitDate);
