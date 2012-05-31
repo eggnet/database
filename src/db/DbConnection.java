@@ -6,14 +6,19 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import models.Change;
 import models.Commit;
+import models.CommitDiff;
+import models.FileDiff;
+import models.DiffEntry;
 import db.Resources.ChangeType;
 
 public abstract class DbConnection {
@@ -509,6 +514,101 @@ public abstract class DbConnection {
 				return rs.getString(1);
 			else
 				return "Binary file";
+		}
+		catch (SQLException e)
+		{
+			e.printStackTrace();
+			return null;
+		}
+	}
+	
+	/**
+	 * Return Map of Diff objects.
+	 * testproject_triet=# select file_id, new_commit_id, old_commit_id, diff_text, char_start, char_end, diff_type from commits natural join file_diffs where commit_date< (select commit_date fr
+om commits where commit_id='3dc4b05fd0ef5460f951c6ecf6c80f6f202dff61') and new_commit_id= commit_id;
+	 * @param fileID
+	 * @param commitID
+	 * @return
+	 */
+	public List<CommitDiff> getDiffTreeFromFirstCommit(String fileID, String commitID)
+	{
+		try{
+			// For each CommitDiff, store a list of FileDiff. For each FileDiff, store a list of DiffEntry
+			List<CommitDiff> CommitList = new ArrayList<CommitDiff>();
+			String sql = "SELECT file_id, new_commit_id, old_commit_id, diff_text, char_start, char_end, diff_type from commits natural join file_diffs where " +
+					"(branch_id=? or branch_id is NULL) and commit_date<= " + 
+					"(select commit_date from commits where commit_id=? and " +
+					"(branch_id=? OR branch_id is NULL) limit 1) AND new_commit_id= commit_id";
+
+			String[] params = {this.branchID, commitID, this.branchID};
+			ResultSet rs = execPreparedQuery(sql, params);
+			
+			// Get first CommitDiff
+			if (!rs.next())
+				return CommitList;
+			
+			String currentNewCommitId = rs.getString("new_commit_id");
+			String currentOldCommitId = rs.getString("old_commit_id");
+			String currentFileId 	  = rs.getString("file_id");
+			String currentDiffTxt     = rs.getString("diff_text");
+			String currentDiffType		  = rs.getString("diff_type");
+			int currentCharStart = rs.getInt("char_start");
+			int currentCharEnd = rs.getInt("char_end");
+			
+			// Group CommitDiff by old,new commit id
+			List<FileDiff> currentFileDiffList = new ArrayList<FileDiff>();
+			CommitDiff currentCommitDiff = new CommitDiff(currentNewCommitId, currentOldCommitId, currentFileDiffList);
+			
+			// Group FileDiff by file_id
+			DiffEntry de = new DiffEntry(currentFileId, currentNewCommitId, currentOldCommitId, currentDiffTxt, currentCharStart, currentCharEnd, currentDiffType);
+			FileDiff currentFileDiff = new FileDiff(currentFileId, new ArrayList<DiffEntry>());
+			currentFileDiff.addDiffEntry(de);
+			
+			while(rs.next())
+			{
+				// Group all CommitDiff by old and new commit id
+				String newCommitId  = rs.getString("new_commit_id");
+				String oldCommitId  = rs.getString("old_commit_id");
+				String fileId 	    = rs.getString("file_id");
+				String diffTxt      = rs.getString("diff_text");
+				String diffType		= rs.getString("diff_type");
+				int charStart 		= rs.getInt("char_start");
+				int charEnd 		= rs.getInt("char_end");
+				
+				// same CommitDiff
+				if (newCommitId.equals(currentNewCommitId) && oldCommitId.equals(currentOldCommitId))
+				{
+					// same FileDiff
+					if(fileId.equals(currentFileId))
+					{
+						currentFileDiff.addDiffEntry(new DiffEntry(fileId, newCommitId, oldCommitId, diffTxt, charStart, charEnd, diffType));
+					}
+					else
+					{
+						// add the current FileDiff to the CommitDiff and start new fileDiff
+						currentCommitDiff.addFileDiff(currentFileDiff);
+						currentFileDiff = new FileDiff(fileId, new ArrayList<DiffEntry>());
+						currentFileId = fileId;
+					}
+				}
+				else
+				{
+					// add current CommitDiff and start new CommitDiff
+					CommitList.add(currentCommitDiff);
+					currentCommitDiff = new CommitDiff(newCommitId, oldCommitId, new ArrayList<FileDiff>()); 
+					currentNewCommitId = newCommitId;
+					currentOldCommitId = oldCommitId;
+					
+					// start new File
+					currentFileDiff = new FileDiff(fileId, new ArrayList<DiffEntry>());
+					currentFileId = fileId;
+					
+					// add new diff entry
+					currentFileDiff.addDiffEntry(new DiffEntry(fileId, newCommitId, oldCommitId, diffTxt, charStart, charEnd, diffType));
+				}
+			}
+			
+			return CommitList;	
 		}
 		catch (SQLException e)
 		{
