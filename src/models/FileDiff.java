@@ -3,6 +3,8 @@ package models;
 import java.util.ArrayList;
 import java.util.List;
 
+import models.DiffEntry.diff_types;
+
 public class FileDiff {
 	private String file_id;
 	private List<DiffEntry> diffEntries;
@@ -37,5 +39,21 @@ public class FileDiff {
 
 	public void setDiffEntries(List<DiffEntry> diffEntries) {
 		this.diffEntries = diffEntries;
+	}
+	
+	public boolean isAddCommit()
+	{
+		for(DiffEntry de : diffEntries)
+			if(de.getDiff_type() == diff_types.DIFF_ADD)
+				return true;
+		return false;
+	}
+	
+	public boolean isDeleteCommit()
+	{
+		for(DiffEntry de : diffEntries)
+			if(de.getDiff_type() == diff_types.DIFF_DELETE)
+				return true;
+		return false;
 	}
 }

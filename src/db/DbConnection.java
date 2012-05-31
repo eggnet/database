@@ -19,6 +19,7 @@ import java.util.Set;
 import models.Change;
 import models.Commit;
 import models.CommitDiff;
+import models.DiffEntry.diff_types;
 import models.FileDiff;
 import models.DiffEntry;
 import db.Resources.ChangeType;
@@ -526,6 +527,97 @@ public abstract class DbConnection {
 	}
 	
 	/**
+	 * Construct raw file from diffs object
+	 * @param fileID
+	 * @param commitID
+	 * @return
+	 */
+	public String getRawFileFromDiffTree(String fileID, String commitID)
+	{
+		// Todo @triet Decide which one is the closest commit that has a copy of the raw file
+		String rawFile = "";
+		
+		// Get the commit diff tree for this commit
+		List<CommitDiff> commitDiffs = getDiffTreeFromFirstCommit(fileID, commitID);
+		
+		// Rebuild the raw file from the diff tree
+		for(CommitDiff comDiff : commitDiffs)
+		{
+			if(comDiff.getFileDiffs().size() == 0)
+				continue;
+			
+			// Each version of the commit
+			FileDiff file = comDiff.getFileDiffs().get(0);
+			if(file.isAddCommit())
+			{
+				//Should have only single DiffEntry - DIFF_ADD
+				if(file.getDiffEntries().size()>0)
+					rawFile = file.getDiffEntries().get(0).getDiff_text();
+				continue;
+			}
+			else if(file.isDeleteCommit())
+			{
+				rawFile = "";
+			}
+			else //create the next version of the file
+			{
+				List<DiffEntry> deleteList = new ArrayList<DiffEntry>();
+				List<DiffEntry> insertList = new ArrayList<DiffEntry>();
+			
+				// Store list of Delete Entry backward
+				for(DiffEntry entry: file.getDiffEntries())
+				{
+					if(entry.getDiff_type() == diff_types.DIFF_MODIFYDELETE)
+						deleteList.add(entry);
+					else if(entry.getDiff_type() == diff_types.DIFF_MODIFYINSERT)
+						insertList.add(entry);
+				}		
+				
+				//Get Original Equal in reverse order
+				for(int i =deleteList.size() - 1; i >= 0; i--)
+				{
+					DiffEntry entry = deleteList.get(i);
+					//Remove the delete entry
+					int firstEnd = entry.getChar_start() -1;
+					int secondStart = entry.getChar_end() +1;
+					if(firstEnd < 0)
+						firstEnd = 0;
+					if(secondStart > rawFile.length() - 1)
+						secondStart = rawFile.length() - 1;
+					
+					String firstPart  = rawFile.substring(0, firstEnd);
+					String secondPart = rawFile.substring(secondStart);
+					// merge back rawfile
+					rawFile = firstPart + secondPart;
+				}
+				
+				//Create new version of the file
+				for(DiffEntry entry : insertList)
+				{
+					// Split up the Rawfile for insert
+					int firstEnd = entry.getChar_start() -1;
+					int secondStart = entry.getChar_end() +1;
+					if(firstEnd < 0)
+						firstEnd = 0;
+					if(secondStart > rawFile.length() - 1)
+						secondStart = rawFile.length() - 1;
+					
+					String firstPart  = rawFile.substring(0, firstEnd);
+					String secondPart = rawFile.substring(secondStart);
+					
+					// insert new change
+					rawFile = firstPart + entry.getDiff_text() + secondPart;
+				}
+				
+				// Print out
+				System.out.println(rawFile);
+			}
+		}
+		
+		return rawFile;
+	}
+	
+	/**
 	 * Return Map of Diff objects.
 	 * testproject_triet=# select file_id, new_commit_id, old_commit_id, diff_text, char_start, char_end, diff_type from commits natural join file_diffs where commit_date< (select commit_date fr
 om commits where commit_id='3dc4b05fd0ef5460f951c6ecf6c80f6f202dff61') and new_commit_id= commit_id;
@@ -539,11 +631,12 @@ om commits where commit_id='3dc4b05fd0ef5460f951c6ecf6c80f6f202dff61') and new_c
 			// For each CommitDiff, store a list of FileDiff. For each FileDiff, store a list of DiffEntry
 			List<CommitDiff> CommitList = new ArrayList<CommitDiff>();
 			String sql = "SELECT file_id, new_commit_id, old_commit_id, diff_text, char_start, char_end, diff_type from commits natural join file_diffs where " +
+					"file_id=? and " +
 					"(branch_id=? or branch_id is NULL) and commit_date<= " + 
 					"(select commit_date from commits where commit_id=? and " +
 					"(branch_id=? OR branch_id is NULL) limit 1) AND new_commit_id= commit_id";
 
-			String[] params = {this.branchID, commitID, this.branchID};
+			String[] params = {fileID, this.branchID, commitID, this.branchID};
 			ResultSet rs = execPreparedQuery(sql, params);
 			
 			// Get first CommitDiff
