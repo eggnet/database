@@ -4,18 +4,27 @@ import db.Resources;
 import db.Resources.ChangeType;
 
 public class Change
-{
-	private String					CommitId;
-	private String					OwnerId;
-	private String					FileId;
-	private int						CharStart;
-	private int						CharEnd;
-	private Resources.ChangeType	ChangeType;
+{	
+	protected String				CommitId;
+	protected String				OwnerId;
+	protected String				FileId;
+	protected int					CharStart;
+	protected int					CharEnd;
+	protected Resources.ChangeType	ChangeType;
 
 	public Change()
+	{ }
+	
+	public Change(Change other)
 	{
+		CommitId = other.getCommitId();
+		OwnerId = other.getOwnerId();
+		FileId = other.getFileId();
+		CharStart = other.getCharStart();
+		CharEnd = other.getCharEnd();
+		ChangeType = other.getChangeType();
 	}
-
+	
 	public Change(String ownerId, String commitId, ChangeType changeType, String fileId, int charStart, int charEnd)
 	{
 		super();
