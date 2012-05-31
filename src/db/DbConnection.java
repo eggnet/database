@@ -666,14 +666,14 @@ public abstract class DbConnection {
 	{
 		try 
 		{
-			String sql = "SELECT commit_id, file_id, owner_id, line_start, line_end, change_type FROM owners natural join commits where file_id=? and commit_id=?" +
-					"and line_start='" + CharStart + "' and (branch_id=? OR branch_id is NULL) and commit_date < "+ CommitDate + " order by id desc";
+			String sql = "SELECT commit_id, file_id, owner_id, char_start, char_end, change_type FROM owners natural join commits where file_id=? and commit_id=?" +
+					"and char_start='" + CharStart + "' and (branch_id=? OR branch_id is NULL) and commit_date < "+ CommitDate + " order by id desc";
 			String[] parms = {FileId, branchID};
 			ResultSet rs = execPreparedQuery(sql, parms);
 			if (!rs.next())
 				return null;
-			return new Change(rs.getString("owner_id"), rs.getString("commit_id"), Resources.ChangeType.valueOf(rs.getString("change_type")), rs.getString("file_id"), rs.getInt("line_start"), 
-						rs.getInt("line_end"));
+			return new Change(rs.getString("owner_id"), rs.getString("commit_id"), Resources.ChangeType.valueOf(rs.getString("change_type")), rs.getString("file_id"), rs.getInt("char_start"), 
+						rs.getInt("char_end"));
 		}
 		catch(SQLException e) 
 		{
@@ -686,7 +686,7 @@ public abstract class DbConnection {
 	{
 		try
 		{
-			String sql = "SELECT commit_id, file_id, owner_id, line_start, line_end, change_type FROM owners natural join commits where file_id=? AND commit_date < ? AND "
+			String sql = "SELECT commit_id, file_id, owner_id, char_start, char_end, change_type FROM owners natural join commits where file_id=? AND commit_date < ? AND "
 					+ "(branch_id=? OR branch_id is NULL) order by id desc";
 			PreparedStatement stmt = conn.prepareStatement(sql);
 			stmt.setString(1, fileId);
@@ -695,8 +695,8 @@ public abstract class DbConnection {
 			ResultSet rs = stmt.executeQuery();
 			if (!rs.next())
 				return null;
-			return new Change(rs.getString("owner_id"), rs.getString("commit_id"), Resources.ChangeType.valueOf(rs.getString("change_type")), rs.getString("file_id"), rs.getInt("line_start"), 
-						rs.getInt("line_end"));
+			return new Change(rs.getString("owner_id"), rs.getString("commit_id"), Resources.ChangeType.valueOf(rs.getString("change_type")), rs.getString("file_id"), rs.getInt("char_start"), 
+						rs.getInt("char_end"));
 		}
 		catch (SQLException e)
 		{
