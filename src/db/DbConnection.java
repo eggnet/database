@@ -553,6 +553,7 @@ public abstract class DbConnection {
 				//Should have only single DiffEntry - DIFF_ADD
 				if(file.getDiffEntries().size()>0)
 					rawFile = file.getDiffEntries().get(0).getDiff_text();
+				
 				continue;
 			}
 			else if(file.isDeleteCommit())
@@ -578,12 +579,14 @@ public abstract class DbConnection {
 				{
 					DiffEntry entry = deleteList.get(i);
 					//Remove the delete entry
-					int firstEnd = entry.getChar_start() -1;
-					int secondStart = entry.getChar_end() +1;
+					int firstEnd    = entry.getChar_start();
+					int secondStart = entry.getChar_end();
 					if(firstEnd < 0)
 						firstEnd = 0;
 					if(secondStart > rawFile.length() - 1)
 						secondStart = rawFile.length() - 1;
+					if(secondStart <0)
+						secondStart =0;
 					
 					String firstPart  = rawFile.substring(0, firstEnd);
 					String secondPart = rawFile.substring(secondStart);
@@ -595,12 +598,14 @@ public abstract class DbConnection {
 				for(DiffEntry entry : insertList)
 				{
 					// Split up the Rawfile for insert
-					int firstEnd = entry.getChar_start() -1;
-					int secondStart = entry.getChar_end() +1;
+					int firstEnd    = entry.getChar_start();
+					int secondStart = entry.getChar_start();
 					if(firstEnd < 0)
 						firstEnd = 0;
 					if(secondStart > rawFile.length() - 1)
 						secondStart = rawFile.length() - 1;
+					if(secondStart < 0)
+						secondStart =0;
 					
 					String firstPart  = rawFile.substring(0, firstEnd);
 					String secondPart = rawFile.substring(secondStart);
@@ -608,9 +613,6 @@ public abstract class DbConnection {
 					// insert new change
 					rawFile = firstPart + entry.getDiff_text() + secondPart;
 				}
-				
-				// Print out
-				System.out.println(rawFile);
 			}
 		}
 		
@@ -618,12 +620,10 @@ public abstract class DbConnection {
 	}
 	
 	/**
-	 * Return Map of Diff objects.
-	 * testproject_triet=# select file_id, new_commit_id, old_commit_id, diff_text, char_start, char_end, diff_type from commits natural join file_diffs where commit_date< (select commit_date fr
-om commits where commit_id='3dc4b05fd0ef5460f951c6ecf6c80f6f202dff61') and new_commit_id= commit_id;
+	 * Return the Diff tree for a file start from root to commitID.
 	 * @param fileID
 	 * @param commitID
-	 * @return
+	 * @return Lis<CommitDiff> list of all the diffs from Root to Current Commit
 	 */
 	public List<CommitDiff> getDiffTreeFromFirstCommit(String fileID, String commitID)
 	{
@@ -690,6 +690,7 @@ om commits where commit_id='3dc4b05fd0ef5460f951c6ecf6c80f6f202dff61') and new_c
 				else
 				{
 					// add current CommitDiff and start new CommitDiff
+					currentCommitDiff.addFileDiff(currentFileDiff);
 					CommitList.add(currentCommitDiff);
 					currentCommitDiff = new CommitDiff(newCommitId, oldCommitId, new ArrayList<FileDiff>()); 
 					currentNewCommitId = newCommitId;
@@ -703,6 +704,10 @@ om commits where commit_id='3dc4b05fd0ef5460f951c6ecf6c80f6f202dff61') and new_c
 					currentFileDiff.addDiffEntry(new DiffEntry(fileId, newCommitId, oldCommitId, diffTxt, charStart, charEnd, diffType));
 				}
 			}
+			
+			// Added last commit diff
+			currentCommitDiff.addFileDiff(currentFileDiff);
+			CommitList.add(currentCommitDiff);
 			
 			return CommitList;	
 		}
