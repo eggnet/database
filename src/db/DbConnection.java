@@ -717,6 +717,45 @@ public abstract class DbConnection {
 			return null;
 		}
 	}
+
+	/**
+	 * Get diff entries for 2 consecutive commits
+	 * @param fileID
+	 * @param oldCommitID
+	 * @param newCommitID
+	 * @return List<DiffEntry> list of the diffs, empty if there is none
+	 */
+	public List<DiffEntry> getDiffsFromTwoConsecutiveCommits(String fileID, String oldCommitID, String newCommitID)
+	{
+		try{
+			List<DiffEntry> diffList = new ArrayList<DiffEntry>();
+			String sql = "SELECT file_id, new_commit_id, old_commit_id, diff_text, char_start, char_end, diff_type from file_diffs where " +
+						"file_id=? and old_commit_id=? and new_commit_id=?";
+
+			String[] params = {fileID, oldCommitID, newCommitID};
+			ResultSet rs = execPreparedQuery(sql, params);
+			
+			while(rs.next())
+			{
+				String newCommitId  = rs.getString("new_commit_id");
+				String oldCommitId  = rs.getString("old_commit_id");
+				String fileId 	    = rs.getString("file_id");
+				String diffTxt      = rs.getString("diff_text");
+				String diffType		= rs.getString("diff_type");
+				int charStart 		= rs.getInt("char_start");
+				int charEnd 		= rs.getInt("char_end");
+				
+				diffList.add(new DiffEntry(fileId, newCommitId, oldCommitId, diffTxt, charStart, charEnd, diffType));
+			}
+			
+			return diffList;	
+		}
+		catch (SQLException e)
+		{
+			e.printStackTrace();
+			return null;
+		}
+	}
 	
 	/**
 	 * Checks whether or not a commit is included in the owners table
