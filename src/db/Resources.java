@@ -61,4 +61,15 @@ public abstract class Resources {
 		
 		return index;
 	}
+	
+	public static void log(String log)
+	{
+		System.out.println(log);
+	}
+	
+	public static void log(String fmt, Object... args)
+	{
+		System.out.printf(fmt, args);
+		System.out.println();
+	}
 }
