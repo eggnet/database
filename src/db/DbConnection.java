@@ -8,10 +8,8 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -264,176 +262,6 @@ public abstract class DbConnection {
 		}
 	}
 	
-	/**
-	 * Returns an ordered map of <Commit, Set<ChangedFilePaths>> before a given commitID
-	 * @param commitID
-	 * @param ascending
-	 * @return
-	 */
-	public Map<Commit, Map<String, Resources.ChangeType>> getCommitObjectsBeforeChanges(String commitID, boolean ascending, boolean inclusive)
-	{
-		try{
-			Map<Commit, Map<String, Resources.ChangeType>> changes = new LinkedHashMap<Commit, Map<String, Resources.ChangeType>>();
-			String inclusiveStr = " ";
-			if (inclusive)
-				inclusiveStr = "= ";
-			String sql = "SELECT commit_id, author, author_email, comments, commit_date, branch_id, file_id, change_type from changes natural join commits where " +
-					"(branch_id=? or branch_id is NULL) and commit_date <" + inclusiveStr + 
-					"(select commit_date from commits where commit_id=? and " +
-					"(branch_id=? OR branch_id is NULL) limit 1) ORDER BY id";
-			if (!ascending)
-				sql += " desc";
-			String[] params = {this.branchID, commitID, this.branchID};
-			ResultSet rs = execPreparedQuery(sql, params);
-			Commit currentCommit;
-			Map<String, Resources.ChangeType> currentFileset;
-			if (!rs.next())
-				return changes;
-			currentFileset = new HashMap<String, Resources.ChangeType>();
-			currentCommit = new Commit(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getTimestamp(5), rs.getString(6));
-			currentFileset.put(rs.getString("file_id"), Resources.ChangeType.valueOf(rs.getString("change_type")));
-			while(rs.next())
-			{
-				if (rs.getString("commit_id").equals(currentCommit.getCommit_id()))
-				{
-					// append to the current commit
-					currentFileset.put(rs.getString("file_id"), Resources.ChangeType.valueOf(rs.getString("change_type")));
-				}
-				else
-				{
-					// start a new one
-					changes.put(currentCommit, currentFileset);
-					currentFileset = new HashMap<String, Resources.ChangeType>();
-					currentCommit = new Commit(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getTimestamp(5), rs.getString(6));
-					currentFileset.put(rs.getString("file_id"), Resources.ChangeType.valueOf(rs.getString("change_type")));
-				}
-			}
-			changes.put(currentCommit, currentFileset);
-			return changes;
-		}
-		catch (SQLException e)
-		{
-			e.printStackTrace();
-			return null;
-		}
-	}
-	
-	/**
-	 * Return a list of commits and their changed files between any 2 commits, order matters.
-	 * @param beforeCommitID
-	 * @param afterCommitID
-	 * @param ascending
-	 * @return
-	 */
-	public Map<String, Set<String>> getCommitsBeforeAndAfterChanges(String beforeCommitID, String afterCommitID, boolean ascending, boolean inclusive)
-	{
-		try{
-			Map<String, Set<String>> changes = new LinkedHashMap<String, Set<String>>();
-			String inclusiveStr = " ";
-			if (inclusive)
-				inclusiveStr = "= ";
-			String sql = "SELECT commit_id, file_id from changes natural join commits where " +
-					"(branch_id=? or branch_id is NULL) and commit_date <" + inclusiveStr + 
-					"(select commit_date from commits where commit_id=? and " +
-					"(branch_id=? OR branch_id is NULL) limit 1) and commit_date >" + inclusiveStr + 
-					"(select commit_date from commits where commit_id=? and " +
-					"(branch_id=? or branch_id is NULL) limit 1) ORDER BY id";
-			if (!ascending)
-				sql += " desc";
-			
-			String[] params = {this.branchID, beforeCommitID, this.branchID, afterCommitID, this.branchID};
-			ResultSet rs = execPreparedQuery(sql, params);
-			String currentCommitId;
-			Set<String> currentFileset;
-			if (!rs.next())
-				return changes;
-			currentFileset = new HashSet<String>();
-			currentCommitId = rs.getString("commit_id");
-			currentFileset.add(rs.getString("file_id"));
-			while(rs.next())
-			{
-				if (rs.getString("commit_id").equals(currentCommitId))
-				{
-					// append to the current commit
-					currentFileset.add(rs.getString("file_id"));
-				}
-				else
-				{
-					// start a new one
-					changes.put(currentCommitId, currentFileset);
-					currentFileset = new HashSet<String>();
-					currentCommitId = rs.getString("commit_id");
-					currentFileset.add(rs.getString("file_id"));
-				}
-			}
-			changes.put(currentCommitId, currentFileset);
-			return changes;
-		}
-		catch (SQLException e)
-		{
-			e.printStackTrace();
-			return null;
-		}
-	}
-	
-	/**
-	 * Return a list of commits and their changed files between any 2 commits, order matters.
-	 * @param beforeCommitID
-	 * @param afterCommitID
-	 * @param ascending
-	 * @return
-	 */
-	public Map<Commit, Map<String, Resources.ChangeType>> getCommitObjectsBeforeAndAfterChanges(String beforeCommitID, String afterCommitID, boolean ascending, boolean inclusive)
-	{
-		try{
-			Map<Commit, Map<String, Resources.ChangeType>> changes = new LinkedHashMap<Commit, Map<String, Resources.ChangeType>>();
-			String inclusiveStr = " ";
-			if (inclusive)
-				inclusiveStr = "= ";
-			String sql = "SELECT commit_id, author, author_email, comments, commit_date, branch_id, file_id, change_type from changes natural join commits where " +
-					"(branch_id=? or branch_id is NULL) and commit_date <" + inclusiveStr + 
-					"(select commit_date from commits where commit_id=? and " +
-					"(branch_id=? OR branch_id is NULL) limit 1) and commit_date >" + inclusiveStr +
-					"(select commit_date from commits where commit_id=? and " +
-					"(branch_id=? or branch_id is NULL) limit 1) ORDER BY id";
-			if (!ascending)
-				sql += " desc";
-			
-			String[] params = {this.branchID, beforeCommitID, this.branchID, afterCommitID, this.branchID};
-			ResultSet rs = execPreparedQuery(sql, params);
-			Commit currentCommit;
-			Map<String, Resources.ChangeType> currentFileset;
-			if (!rs.next())
-				return changes;
-			currentFileset = new HashMap<String, Resources.ChangeType>();
-			currentCommit = new Commit(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getTimestamp(5), rs.getString(6));
-			currentFileset.put(rs.getString("file_id"), Resources.ChangeType.valueOf(rs.getString("change_type")));
-			while(rs.next())
-			{
-				if (rs.getString("commit_id").equals(currentCommit.getCommit_id()))
-				{
-					// append to the current commit
-					currentFileset.put(rs.getString("file_id"), Resources.ChangeType.valueOf(rs.getString("change_type")));
-				}
-				else
-				{
-					// start a new one
-					changes.put(currentCommit, currentFileset);
-					currentFileset = new HashMap<String, Resources.ChangeType>();
-					currentCommit = new Commit(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getTimestamp(5), rs.getString(6));
-					currentFileset.put(rs.getString("file_id"), Resources.ChangeType.valueOf(rs.getString("change_type")));
-				}
-			}
-			changes.put(currentCommit, currentFileset);
-			return changes;
-		}
-		catch (SQLException e)
-		{
-			e.printStackTrace();
-			return null;
-		}
-	}
-	
 	public String getTimeStamp(String commit_id)
 	{
 		try {
@@ -451,45 +279,6 @@ public abstract class DbConnection {
 		}
 	}
 	
-	public Set<String> getBinaryFiles()
-	{
-		HashSet<String> binaryFiles = new HashSet<String>();
-		try {
-			String[] params = {};
-			ResultSet rs = execPreparedQuery("SELECT file_id from changes EXCEPT (SELECT file_id from files);", params);
-			while(rs.next())
-			{
-				binaryFiles.add(rs.getString(1));
-			}
-			
-			return binaryFiles;
-		}
-		catch(SQLException e)
-		{
-			e.printStackTrace();
-			return null;
-		}
-	}
-	
-	public Set<String> getChangedFilesFromCommit(String commitID)
-	{
-		HashSet<String> changed = new HashSet<String>();
-		try {
-			String[] params = {commitID};
-			ResultSet rs = execPreparedQuery("SELECT file_id from changes where commit_id=?", params);
-			while(rs.next())
-			{
-				changed.add(rs.getString(1));
-			}
-			return changed;
-		}
-		catch (SQLException e)
-		{
-			e.printStackTrace();
-			return null;
-		}
-	}
-	
 	public Set<String> getFileStructureFromCommit(String commitID)
 	{
 		HashSet<String> files = new HashSet<String>();
@@ -501,24 +290,6 @@ public abstract class DbConnection {
 				files.add(rs.getString(1));
 			}
 			return files;
-		}
-		catch (SQLException e)
-		{
-			e.printStackTrace();
-			return null;
-		}
-	}
-	
-	public String getRawFile(String fileID, String commitID)
-	{
-		try{
-			String sql = "SELECT raw_file from files where commit_id=? and file_id=?;";
-			String[] params = {commitID, fileID};
-			ResultSet rs = execPreparedQuery(sql, params);
-			if(rs.next())
-				return rs.getString(1);
-			else
-				return "Binary file";
 		}
 		catch (SQLException e)
 		{
@@ -882,40 +653,6 @@ public abstract class DbConnection {
 				return null;
 		}
 		catch(SQLException e)
-		{
-			e.printStackTrace();
-			return null;
-		}
-	}
-	
-	/**
-	 * Gets the latest revision of a file from a base commitId
-	 * @param CommitId
-	 * @param fileId
-	 * @return
-	 */
-	public String getLatestRevOfFile(String CommitId, String fileId)
-	{
-		try {
-			// get the last commit that changed the file
-			String sql = "SELECT commit_id from changes natural join commits where commit_date < " +
-					"(SELECT commit_date from commits where commit_id=? limit 1)" +
-					" and file_id=? order by id desc limit 1;";
-			String[] parms = {CommitId, fileId};
-			ResultSet rs = execPreparedQuery(sql, parms);
-			if (!rs.next())
-				return null;
-			
-			// Get the raw data 
-			String ChangingCommitId = rs.getString("commit_id");
-			sql = "SELECT raw_file from files where commit_id=? and file_id=?;";
-			String[] secondParms = {ChangingCommitId, fileId};
-			rs = execPreparedQuery(sql, secondParms);
-			if(!rs.next())
-				return "Binary file";
-			return rs.getString("raw_file");
-		}
-		catch (SQLException e)
 		{
 			e.printStackTrace();
 			return null;
