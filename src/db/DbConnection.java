@@ -22,6 +22,7 @@ import models.CommitDiff;
 import models.DiffEntry.diff_types;
 import models.FileDiff;
 import models.DiffEntry;
+import models.CommitFamily;
 import db.Resources.ChangeType;
 
 public abstract class DbConnection {
@@ -526,6 +527,18 @@ public abstract class DbConnection {
 		}
 	}
 	
+	public boolean existInThePath(CommitDiff comDiff, List<CommitFamily> commitPath)
+	{
+		for(CommitFamily cf: commitPath)
+		{
+			if(cf.getChildId().equals(comDiff.getNew_commit_id()) && 
+			   cf.getParentId().equals(comDiff.getOld_commit_id()))
+				return true;
+		}
+		
+		return false;
+	}
+	
 	/**
 	 * Construct raw file from diffs object
 	 * @param fileID
@@ -537,12 +550,18 @@ public abstract class DbConnection {
 		// Todo @triet Decide which one is the closest commit that has a copy of the raw file
 		String rawFile = "";
 		
+		// Get the commit path from CommitID to root
+		List<CommitFamily> commitPath = getCommitPathToRoot(commitID);
+		
 		// Get the commit diff tree for this commit
 		List<CommitDiff> commitDiffs = getDiffTreeFromFirstCommit(fileID, commitID);
 		
 		// Rebuild the raw file from the diff tree
 		for(CommitDiff comDiff : commitDiffs)
 		{
+			if(!existInThePath(comDiff, commitPath))
+				continue;
+			
 			if(comDiff.getFileDiffs().size() == 0)
 				continue;
 			
@@ -617,6 +636,49 @@ public abstract class DbConnection {
 		}
 		
 		return rawFile;
+	}
+	
+	/**
+	 * Return a random path from a commit to the Root.
+	 * @param fileID
+	 * @param commitID
+	 * @return
+	 */
+	public List<CommitFamily> getCommitPathToRoot(String commitID)
+	{
+		try {
+			String sql = "SELECT parent, child from commit_family natural join commits where commit_date <= " +
+					"(SELECT commit_date from commits where commit_id=? limit 1) AND commit_id=child ORDER BY commit_date desc;";
+
+			List<CommitFamily> rawFamilyList = new ArrayList<CommitFamily>();
+			List<CommitFamily> familyList 	 = new ArrayList<CommitFamily>();
+			String[] parms = {commitID};
+			ResultSet rs = execPreparedQuery(sql, parms);
+			while(rs.next())
+			{
+				String parentId = rs.getString("parent");
+				String childId  = rs.getString("child");
+				rawFamilyList.add(new CommitFamily(parentId, childId));
+			}
+			
+			// Get a random path from this commit to Root
+			String currentChild = commitID;
+			for(CommitFamily family : rawFamilyList)
+			{
+				if(family.getChildId().equals(currentChild))
+				{
+					familyList.add(new CommitFamily(family.getParentId(), family.getChildId()));
+					currentChild = family.getParentId();
+				}
+			}
+			
+			return familyList;
+		}
+		catch (SQLException e)
+		{
+			e.printStackTrace();
+			return null;
+		}
 	}
 	
 	/**
