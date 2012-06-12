@@ -310,6 +310,42 @@ public abstract class DbConnection {
 		return false;
 	}
 	
+	public boolean isAddCommit(CommitFamily comFam, List<CommitDiff> comDiffs, String fileName)
+	{
+		for(CommitDiff cd: comDiffs)
+		{
+			if(cd.getNew_commit_id().equals(comFam.getChildId()) && 
+			   cd.getOld_commit_id().equals(comFam.getParentId()))
+			{
+				for(FileDiff fd : cd.getFileDiffs())
+				{
+					if(fd.getFile_id().equals(fileName) && fd.isAddCommit())
+						return true;
+				}
+			}
+		}
+		
+		return false;
+	}
+	
+	public FileDiff getFileDiffForCommitFamily(CommitFamily comFam, List<CommitDiff> comDiffs, String fileName)
+	{
+		for(CommitDiff cd: comDiffs)
+		{
+			if(cd.getNew_commit_id().equals(comFam.getChildId()) && 
+			   cd.getOld_commit_id().equals(comFam.getParentId()))
+			{
+				for(FileDiff fd : cd.getFileDiffs())
+				{
+					if(fd.getFile_id().equals(fileName))
+						return fd;
+				}
+			}
+		}
+		
+		return null;
+	}
+	
 	/**
 	 * Construct raw file from diffs object
 	 * @param fileID
@@ -317,6 +353,124 @@ public abstract class DbConnection {
 	 * @return
 	 */
 	public String getRawFileFromDiffTree(String fileID, String commitID)
+	{
+		String rawFile = "";
+		
+		List<CommitFamily> commitPath = getCommitPathToRoot(commitID);
+		List<CommitDiff> commitDiffs = getDiffTreeFromFirstCommit(fileID, commitID);
+		List<CommitFamily> shortestCommitPath = new ArrayList<CommitFamily>();
+		
+		// Rebuild the commit path that has the latest Add entry in it.
+		for(CommitFamily cf: commitPath)
+		{
+			// this commit Family has the lastest Add for the file, start from here
+			if(isAddCommit(cf, commitDiffs, fileID))
+			{
+				shortestCommitPath.add(cf);
+				break;
+			}
+			else
+			{
+				shortestCommitPath.add(cf);
+			}
+		}
+
+		// Create raw file from the beginning of shortest path
+		for(int i =shortestCommitPath.size() - 1; i >= 0; i--)
+		{
+			// get commitDiff
+			FileDiff file = getFileDiffForCommitFamily(shortestCommitPath.get(i), commitDiffs, fileID);
+			if(file == null)
+				continue;
+			
+			if(file.isAddCommit())
+			{
+				//Should have only single DiffEntry - DIFF_ADD
+				if(file.getDiffEntries().size()>0)
+					rawFile = file.getDiffEntries().get(0).getDiff_text();
+				
+				continue;
+			}
+			else if(file.isDeleteCommit())
+			{
+				rawFile = "";
+			}
+			else //create the next version of the file
+			{
+				List<DiffEntry> deleteList = new ArrayList<DiffEntry>();
+				List<DiffEntry> insertList = new ArrayList<DiffEntry>();
+			
+				// Store list of Delete Entry backward
+				for(DiffEntry entry: file.getDiffEntries())
+				{
+					if(entry.getDiff_type() == diff_types.DIFF_MODIFYDELETE)
+						deleteList.add(entry);
+					else if(entry.getDiff_type() == diff_types.DIFF_MODIFYINSERT)
+						insertList.add(entry);
+				}		
+				
+				//Get Original Equal in reverse order
+				for(int j =deleteList.size() - 1; j >= 0; j--)
+				{
+					DiffEntry entry = deleteList.get(j);
+					//Remove the delete entry
+					int firstEnd    = entry.getChar_start();
+					int secondStart = entry.getChar_end();
+					if(firstEnd < 0)
+						firstEnd = 0;
+					if(secondStart > rawFile.length() - 1)
+						secondStart = rawFile.length() - 1;
+					if(secondStart <0)
+						secondStart =0;
+					
+					// Encounter exception, ignore for now
+					if(firstEnd > rawFile.length())
+					{
+						System.out.println("Delete Raw file error: " + file.getFile_id() + " for " + commitID);
+						System.out.println(entry.getNewCommit_id() +"-"+ entry.getOldCommit_id());
+						System.out.println("from:" + entry.getChar_start() +" to "+ entry.getChar_end());
+						break;
+					}
+					
+					// Merge back rawfile
+					String firstPart  = rawFile.substring(0, firstEnd);
+					String secondPart = rawFile.substring(secondStart);
+					rawFile = firstPart + secondPart;
+				}
+				
+				//Create new version of the file
+				for(DiffEntry entry : insertList)
+				{
+					// Split up the Rawfile for insert
+					int firstEnd    = entry.getChar_start();
+					int secondStart = entry.getChar_start();
+					if(firstEnd < 0)
+						firstEnd = 0;
+					if(secondStart > rawFile.length() - 1)
+						secondStart = rawFile.length() - 1;
+					if(secondStart < 0)
+						secondStart =0;
+					
+					// Encounter exception, ignore for now
+					if(firstEnd > rawFile.length())
+					{
+						System.out.println("Insert Raw file error: " + file.getFile_id() + " for " + commitID);
+						System.out.println(entry.getNewCommit_id() +"-"+ entry.getOldCommit_id());
+						System.out.println("from:" + entry.getChar_start() +" to "+ entry.getChar_end());
+						break;
+					}
+					// insert new change
+					String firstPart  = rawFile.substring(0, firstEnd);
+					String secondPart = rawFile.substring(secondStart);
+					rawFile = firstPart + entry.getDiff_text() + secondPart;
+				}
+			}
+		}
+		
+		return rawFile;
+	}
+	
+	public String getRawFileFromDiffTree2(String fileID, String commitID)
 	{
 		// Todo @triet Decide which one is the closest commit that has a copy of the raw file
 		String rawFile = "";
@@ -327,9 +481,11 @@ public abstract class DbConnection {
 		// Get the commit diff tree for this commit
 		List<CommitDiff> commitDiffs = getDiffTreeFromFirstCommit(fileID, commitID);
 		
+		int commitDiffCount =0;
 		// Rebuild the raw file from the diff tree
 		for(CommitDiff comDiff : commitDiffs)
 		{
+			commitDiffCount++;
 			if(!existInThePath(comDiff, commitPath))
 				continue;
 			
@@ -378,9 +534,18 @@ public abstract class DbConnection {
 					if(secondStart <0)
 						secondStart =0;
 					
+					// Encounter exception, ignore for now
+					if(firstEnd > rawFile.length())
+					{
+						System.out.println("Delete Raw file error: " + file.getFile_id() + " for " + commitID);
+						System.out.println(entry.getNewCommit_id() +"-"+ entry.getOldCommit_id());
+						System.out.println("from:" + entry.getChar_start() +" to "+ entry.getChar_end());
+						break;
+					}
+					
+					// Merge back rawfile
 					String firstPart  = rawFile.substring(0, firstEnd);
 					String secondPart = rawFile.substring(secondStart);
-					// merge back rawfile
 					rawFile = firstPart + secondPart;
 				}
 				
@@ -397,10 +562,17 @@ public abstract class DbConnection {
 					if(secondStart < 0)
 						secondStart =0;
 					
+					// Encounter exception, ignore for now
+					if(firstEnd > rawFile.length())
+					{
+						System.out.println("Insert Raw file error: " + file.getFile_id() + " for " + commitID);
+						System.out.println(entry.getNewCommit_id() +"-"+ entry.getOldCommit_id());
+						System.out.println("from:" + entry.getChar_start() +" to "+ entry.getChar_end());
+						break;
+					}
+					// insert new change
 					String firstPart  = rawFile.substring(0, firstEnd);
 					String secondPart = rawFile.substring(secondStart);
-					
-					// insert new change
 					rawFile = firstPart + entry.getDiff_text() + secondPart;
 				}
 			}
