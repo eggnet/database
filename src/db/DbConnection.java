@@ -182,86 +182,7 @@ public abstract class DbConnection {
 			return false;
 		}
 	}
-	
-	/**
-	 * Returns a HashMap<(filePath), (fileContents)>
-	 * @param commitID
-	 * @return
-	 */
-	public Set<String> getCommitChangedFiles(String commitID)
-	{
-		Set<String> files = new HashSet<String>();
-		try {
-			String sql = "SELECT file_id FROM changes where commit_id=?;";
-			String[] params = {commitID};
-			ResultSet rs = execPreparedQuery(sql, params);
-			while(rs.next())
-			{
-				files.add(rs.getString("file_id"));
-			}
-		}
-		catch (Exception e)
-		{
-			e.printStackTrace();
-			return null;
-		}
-		return files;
-	}
 
-	/**
-	 * Returns an ordered map of <CommitId, Set<ChangedFilePaths>> before a given commitID
-	 * @param commitID
-	 * @param ascending
-	 * @return
-	 */
-	public Map<String, Set<String>> getCommitsBeforeChanges(String commitID, boolean ascending, boolean inclusive)
-	{
-		try{
-			Map<String, Set<String>> changes = new LinkedHashMap<String, Set<String>>();
-			String inclusiveStr = " ";
-			if (inclusive)
-				inclusiveStr = "= ";
-			String sql = "SELECT commit_id, file_id from changes natural join commits where " +
-					"(branch_id=? or branch_id is NULL) and commit_date <" + inclusiveStr + 
-					"(select commit_date from commits where commit_id=? and " +
-					"(branch_id=? OR branch_id is NULL) limit 1) ORDER BY id";
-			if (!ascending)
-				sql += " desc";
-			String[] params = {this.branchID, commitID, this.branchID};
-			ResultSet rs = execPreparedQuery(sql, params);
-			String currentCommitId;
-			Set<String> currentFileset;
-			if (!rs.next())
-				return changes;
-			currentFileset = new HashSet<String>();
-			currentCommitId = rs.getString("commit_id");
-			currentFileset.add(rs.getString("file_id"));
-			while(rs.next())
-			{
-				if (rs.getString("commit_id").equals(currentCommitId))
-				{
-					// append to the current commit
-					currentFileset.add(rs.getString("file_id"));
-				}
-				else
-				{
-					// start a new one
-					changes.put(currentCommitId, currentFileset);
-					currentFileset = new HashSet<String>();
-					currentCommitId = rs.getString("commit_id");
-					currentFileset.add(rs.getString("file_id"));
-				}
-			}
-			changes.put(currentCommitId, currentFileset);
-			return changes;
-		}
-		catch (SQLException e)
-		{
-			e.printStackTrace();
-			return null;
-		}
-	}
-	
 	public String getTimeStamp(String commit_id)
 	{
 		try {
@@ -273,25 +194,6 @@ public abstract class DbConnection {
 				return "";
 		}
 		catch(SQLException e)
-		{
-			e.printStackTrace();
-			return null;
-		}
-	}
-	
-	public Set<String> getFileStructureFromCommit(String commitID)
-	{
-		HashSet<String> files = new HashSet<String>();
-		try {
-			String[] params = {commitID};
-			ResultSet rs = execPreparedQuery("SELECT file_id from source_trees where commit_id=?", params);
-			while(rs.next())
-			{
-				files.add(rs.getString(1));
-			}
-			return files;
-		}
-		catch (SQLException e)
 		{
 			e.printStackTrace();
 			return null;
@@ -504,7 +406,7 @@ public abstract class DbConnection {
 					}
 				}
 				
-				System.out.println(rawFile);
+				//System.out.println(rawFile);
 			}
 		}
 		
