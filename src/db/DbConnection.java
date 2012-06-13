@@ -298,36 +298,6 @@ public abstract class DbConnection {
 		}
 	}
 	
-	public boolean existInThePath(CommitDiff comDiff, List<CommitFamily> commitPath)
-	{
-		for(CommitFamily cf: commitPath)
-		{
-			if(cf.getChildId().equals(comDiff.getNew_commit_id()) && 
-			   cf.getParentId().equals(comDiff.getOld_commit_id()))
-				return true;
-		}
-		
-		return false;
-	}
-	
-	public boolean isAddCommit(CommitFamily comFam, List<CommitDiff> comDiffs, String fileName)
-	{
-		for(CommitDiff cd: comDiffs)
-		{
-			if(cd.getNew_commit_id().equals(comFam.getChildId()) && 
-			   cd.getOld_commit_id().equals(comFam.getParentId()))
-			{
-				for(FileDiff fd : cd.getFileDiffs())
-				{
-					if(fd.getFile_id().equals(fileName) && fd.isAddCommit())
-						return true;
-				}
-			}
-		}
-		
-		return false;
-	}
-	
 	public FileDiff getFileDiffForCommitFamily(CommitFamily comFam, List<CommitDiff> comDiffs, String fileName)
 	{
 		for(CommitDiff cd: comDiffs)
@@ -351,11 +321,33 @@ public abstract class DbConnection {
 		DiffEntry entry = null;
 		for(DiffEntry cur : insertList)
 		{
-			if(cur.getChar_start() > lastEndChar)
+			if(cur.getChar_start() >= lastEndChar)
 			{
 				if(entry!=null)
 				{
-					if(entry.getChar_start()>cur.getChar_start())
+					if(entry.getChar_start() >= cur.getChar_start())
+						entry = cur;
+				}
+				else
+				{
+					entry = cur;
+				}
+			}
+		}
+		
+		return entry;
+	}
+	
+	public DiffEntry getLatestDelete(int lastStartChar, List<DiffEntry> deleteList)
+	{
+		DiffEntry entry = null;
+		for(DiffEntry cur : deleteList)
+		{
+			if(cur.getChar_end() <= lastStartChar)
+			{
+				if(entry!=null)
+				{
+					if(entry.getChar_start() <= cur.getChar_start())
 						entry = cur;
 				}
 				else
@@ -436,47 +428,56 @@ public abstract class DbConnection {
 				}		
 				
 				//Get Original Equal in reverse order
+				int lastStart = rawFile.length();
 				for(int j =deleteList.size() - 1; j >= 0; j--)
 				{
-					DiffEntry entry = deleteList.get(j);
-					//Remove the delete entry
-					int firstEnd    = entry.getChar_start();
-					int secondStart = entry.getChar_end();
-					if(firstEnd < 0)
-						firstEnd = 0;
-					if(secondStart > rawFile.length() - 1)
-						secondStart = rawFile.length() - 1;
-					if(secondStart <0)
-						secondStart =0;
+					DiffEntry entry = getLatestDelete(lastStart, deleteList);
+					if(entry == null)
+						continue;
 					
-					// Encounter exception, ignore for now
-					if(firstEnd > rawFile.length())
+					if(entry.getChar_end() <= lastStart)
 					{
-						System.out.println("Delete Raw file error: " + file.getFile_id() + " for " + commitID);
-						System.out.println(entry.getNewCommit_id() +"-"+ entry.getOldCommit_id());
-						System.out.println("from:" + entry.getChar_start() +" to "+ entry.getChar_end());
-						break;
+						lastStart = entry.getChar_start();
+						
+						//Remove the delete entry
+						int firstEnd    = entry.getChar_start();
+						int secondStart = entry.getChar_end();
+						if(firstEnd < 0)
+							firstEnd = 0;
+						if(secondStart > rawFile.length() - 1)
+							secondStart = rawFile.length() - 1;
+						if(secondStart <0)
+							secondStart =0;
+						
+						// Encounter exception, ignore for now
+						if(firstEnd > rawFile.length())
+						{
+							System.out.println("Delete Raw file error: " + file.getFile_id() + " for " + commitID);
+							System.out.println(entry.getNewCommit_id() +"-"+ entry.getOldCommit_id());
+							System.out.println("from:" + entry.getChar_start() +" to "+ entry.getChar_end());
+							break;
+						}
+						
+						// Merge back rawfile
+						String firstPart  = rawFile.substring(0, firstEnd);
+						String secondPart = rawFile.substring(secondStart);
+						rawFile = firstPart + secondPart;
 					}
-					
-					// Merge back rawfile
-					String firstPart  = rawFile.substring(0, firstEnd);
-					String secondPart = rawFile.substring(secondStart);
-					rawFile = firstPart + secondPart;
 				}
 				
 				//Have to ensure the the order 
 				//Create new version of the file
-				int lastLine = 0;
+				int lastEnd = 0;
 				for(int k=0; k< insertList.size(); k++)
 				{
-					DiffEntry entry = getEarliestInsert(lastLine, insertList);
+					DiffEntry entry = getEarliestInsert(lastEnd, insertList);
 					if(entry == null)
 						continue;
 					
 					// store the last line, need to find the min
-					if(entry.getChar_start() > lastLine)
+					if(entry.getChar_start() >= lastEnd)
 					{
-						lastLine = entry.getChar_end();
+						lastEnd = entry.getChar_end();
 	
 						// Split up the Rawfile for insert
 						int firstEnd    = entry.getChar_start();
