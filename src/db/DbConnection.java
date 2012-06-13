@@ -346,6 +346,28 @@ public abstract class DbConnection {
 		return null;
 	}
 	
+	public DiffEntry getEarliestInsert(int lastEndChar, List<DiffEntry> insertList)
+	{
+		DiffEntry entry = null;
+		for(DiffEntry cur : insertList)
+		{
+			if(cur.getChar_start() > lastEndChar)
+			{
+				if(entry!=null)
+				{
+					if(entry.getChar_start()>cur.getChar_start())
+						entry = cur;
+				}
+				else
+				{
+					entry = cur;
+				}
+			}
+		}
+		
+		return entry;
+	}
+	
 	/**
 	 * Construct raw file from diffs object
 	 * @param fileID
@@ -364,14 +386,18 @@ public abstract class DbConnection {
 		for(CommitFamily cf: commitPath)
 		{
 			// this commit Family has the lastest Add for the file, start from here
-			if(isAddCommit(cf, commitDiffs, fileID))
+			FileDiff fd = getFileDiffForCommitFamily(cf, commitDiffs, fileID);
+			if(fd != null)
 			{
-				shortestCommitPath.add(cf);
-				break;
-			}
-			else
-			{
-				shortestCommitPath.add(cf);
+				if(fd.isAddCommit())
+				{
+					shortestCommitPath.add(cf);
+					break;
+				}
+				else
+				{
+					shortestCommitPath.add(cf);
+				}
 			}
 		}
 
@@ -438,143 +464,46 @@ public abstract class DbConnection {
 					rawFile = firstPart + secondPart;
 				}
 				
+				//Have to ensure the the order 
 				//Create new version of the file
-				for(DiffEntry entry : insertList)
+				int lastLine = 0;
+				for(int k=0; k< insertList.size(); k++)
 				{
-					// Split up the Rawfile for insert
-					int firstEnd    = entry.getChar_start();
-					int secondStart = entry.getChar_start();
-					if(firstEnd < 0)
-						firstEnd = 0;
-					if(secondStart > rawFile.length() - 1)
-						secondStart = rawFile.length() - 1;
-					if(secondStart < 0)
-						secondStart =0;
+					DiffEntry entry = getEarliestInsert(lastLine, insertList);
+					if(entry == null)
+						continue;
 					
-					// Encounter exception, ignore for now
-					if(firstEnd > rawFile.length())
+					// store the last line, need to find the min
+					if(entry.getChar_start() > lastLine)
 					{
-						System.out.println("Insert Raw file error: " + file.getFile_id() + " for " + commitID);
-						System.out.println(entry.getNewCommit_id() +"-"+ entry.getOldCommit_id());
-						System.out.println("from:" + entry.getChar_start() +" to "+ entry.getChar_end());
-						break;
-					}
-					// insert new change
-					String firstPart  = rawFile.substring(0, firstEnd);
-					String secondPart = rawFile.substring(secondStart);
-					rawFile = firstPart + entry.getDiff_text() + secondPart;
-				}
-			}
-		}
-		
-		return rawFile;
-	}
+						lastLine = entry.getChar_end();
 	
-	public String getRawFileFromDiffTree2(String fileID, String commitID)
-	{
-		// Todo @triet Decide which one is the closest commit that has a copy of the raw file
-		String rawFile = "";
-		
-		// Get the commit path from CommitID to root
-		List<CommitFamily> commitPath = getCommitPathToRoot(commitID);
-		
-		// Get the commit diff tree for this commit
-		List<CommitDiff> commitDiffs = getDiffTreeFromFirstCommit(fileID, commitID);
-		
-		int commitDiffCount =0;
-		// Rebuild the raw file from the diff tree
-		for(CommitDiff comDiff : commitDiffs)
-		{
-			commitDiffCount++;
-			if(!existInThePath(comDiff, commitPath))
-				continue;
-			
-			if(comDiff.getFileDiffs().size() == 0)
-				continue;
-			
-			// Each version of the commit
-			FileDiff file = comDiff.getFileDiffs().get(0);
-			if(file.isAddCommit())
-			{
-				//Should have only single DiffEntry - DIFF_ADD
-				if(file.getDiffEntries().size()>0)
-					rawFile = file.getDiffEntries().get(0).getDiff_text();
-				
-				continue;
-			}
-			else if(file.isDeleteCommit())
-			{
-				rawFile = "";
-			}
-			else //create the next version of the file
-			{
-				List<DiffEntry> deleteList = new ArrayList<DiffEntry>();
-				List<DiffEntry> insertList = new ArrayList<DiffEntry>();
-			
-				// Store list of Delete Entry backward
-				for(DiffEntry entry: file.getDiffEntries())
-				{
-					if(entry.getDiff_type() == diff_types.DIFF_MODIFYDELETE)
-						deleteList.add(entry);
-					else if(entry.getDiff_type() == diff_types.DIFF_MODIFYINSERT)
-						insertList.add(entry);
-				}		
-				
-				//Get Original Equal in reverse order
-				for(int i =deleteList.size() - 1; i >= 0; i--)
-				{
-					DiffEntry entry = deleteList.get(i);
-					//Remove the delete entry
-					int firstEnd    = entry.getChar_start();
-					int secondStart = entry.getChar_end();
-					if(firstEnd < 0)
-						firstEnd = 0;
-					if(secondStart > rawFile.length() - 1)
-						secondStart = rawFile.length() - 1;
-					if(secondStart <0)
-						secondStart =0;
-					
-					// Encounter exception, ignore for now
-					if(firstEnd > rawFile.length())
-					{
-						System.out.println("Delete Raw file error: " + file.getFile_id() + " for " + commitID);
-						System.out.println(entry.getNewCommit_id() +"-"+ entry.getOldCommit_id());
-						System.out.println("from:" + entry.getChar_start() +" to "+ entry.getChar_end());
-						break;
+						// Split up the Rawfile for insert
+						int firstEnd    = entry.getChar_start();
+						int secondStart = entry.getChar_start();
+						if(firstEnd < 0)
+							firstEnd = 0;
+						if(secondStart > rawFile.length() - 1)
+							secondStart = rawFile.length() - 1;
+						if(secondStart < 0)
+							secondStart =0;
+						
+						// Encounter exception, ignore for now
+						if(firstEnd > rawFile.length())
+						{
+							System.out.println("Insert Raw file error: " + file.getFile_id() + " for " + commitID);
+							System.out.println(entry.getNewCommit_id() +"-"+ entry.getOldCommit_id());
+							System.out.println("from:" + entry.getChar_start() +" to "+ entry.getChar_end());
+							break;
+						}
+						// insert new change
+						String firstPart  = rawFile.substring(0, firstEnd);
+						String secondPart = rawFile.substring(secondStart);
+						rawFile = firstPart + entry.getDiff_text() + secondPart;
 					}
-					
-					// Merge back rawfile
-					String firstPart  = rawFile.substring(0, firstEnd);
-					String secondPart = rawFile.substring(secondStart);
-					rawFile = firstPart + secondPart;
 				}
 				
-				//Create new version of the file
-				for(DiffEntry entry : insertList)
-				{
-					// Split up the Rawfile for insert
-					int firstEnd    = entry.getChar_start();
-					int secondStart = entry.getChar_start();
-					if(firstEnd < 0)
-						firstEnd = 0;
-					if(secondStart > rawFile.length() - 1)
-						secondStart = rawFile.length() - 1;
-					if(secondStart < 0)
-						secondStart =0;
-					
-					// Encounter exception, ignore for now
-					if(firstEnd > rawFile.length())
-					{
-						System.out.println("Insert Raw file error: " + file.getFile_id() + " for " + commitID);
-						System.out.println(entry.getNewCommit_id() +"-"+ entry.getOldCommit_id());
-						System.out.println("from:" + entry.getChar_start() +" to "+ entry.getChar_end());
-						break;
-					}
-					// insert new change
-					String firstPart  = rawFile.substring(0, firstEnd);
-					String secondPart = rawFile.substring(secondStart);
-					rawFile = firstPart + entry.getDiff_text() + secondPart;
-				}
+				System.out.println(rawFile);
 			}
 		}
 		
@@ -590,12 +519,14 @@ public abstract class DbConnection {
 	public List<CommitFamily> getCommitPathToRoot(String commitID)
 	{
 		try {
-			String sql = "SELECT parent, child from commit_family natural join commits where commit_date <= " +
-					"(SELECT commit_date from commits where commit_id=? limit 1) AND commit_id=child ORDER BY commit_date desc;";
+			String sql = "SELECT parent, child from commit_family natural join commits where " +
+					"(branch_id=? or branch_id is NULL) and " +
+					"commit_date <= " +
+					"(SELECT commit_date from commits where commit_id=? and (branch_id=? OR branch_id is NULL) limit 1) AND commit_id=child ORDER BY commit_date desc;";
 
 			List<CommitFamily> rawFamilyList = new ArrayList<CommitFamily>();
 			List<CommitFamily> familyList 	 = new ArrayList<CommitFamily>();
-			String[] parms = {commitID};
+			String[] parms = {this.branchID,commitID, this.branchID};
 			ResultSet rs = execPreparedQuery(sql, parms);
 			while(rs.next())
 			{
@@ -608,10 +539,15 @@ public abstract class DbConnection {
 			String currentChild = commitID;
 			for(CommitFamily family : rawFamilyList)
 			{
-				if(family.getChildId().equals(currentChild))
+				// Look for its parent
+				for(CommitFamily secondFamily : rawFamilyList)
 				{
-					familyList.add(new CommitFamily(family.getParentId(), family.getChildId()));
-					currentChild = family.getParentId();
+					if(secondFamily.getChildId().equals(currentChild))
+					{
+						familyList.add(new CommitFamily(secondFamily.getParentId(), secondFamily.getChildId()));
+						currentChild = secondFamily.getParentId();
+						break;
+					}
 				}
 			}
 			
