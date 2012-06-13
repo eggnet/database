@@ -478,7 +478,7 @@ public abstract class DbConnection {
 					"file_id=? and " +
 					"(branch_id=? or branch_id is NULL) and commit_date<= " + 
 					"(select commit_date from commits where commit_id=? and " +
-					"(branch_id=? OR branch_id is NULL) limit 1) AND new_commit_id= commit_id";
+					"(branch_id=? OR branch_id is NULL) limit 1) AND new_commit_id= commit_id ORDER BY old_commit_id, new_commit_id";
 
 			String[] params = {fileID, this.branchID, commitID, this.branchID};
 			ResultSet rs = execPreparedQuery(sql, params);
