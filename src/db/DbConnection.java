@@ -269,13 +269,12 @@ public abstract class DbConnection {
 	 * @return
 	 * @throws Exception 
 	 */
-	public String getRawFileFromDiffTree(String fileID, String commitID)
+	public String getRawFileFromDiffTree(String fileID, String commitID, List<CommitFamily> commitPath)
 	{
 		try
 		{
 			String rawFile = "";
 			
-			List<CommitFamily> commitPath = getCommitPathToRoot(commitID);
 			List<CommitDiff> commitDiffs = getDiffTreeFromFirstCommit(fileID, commitID);
 			List<CommitFamily> shortestCommitPath = new ArrayList<CommitFamily>();
 			
