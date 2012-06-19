@@ -8,19 +8,17 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import models.Change;
 import models.Commit;
 import models.CommitDiff;
+import models.CommitFamily;
+import models.DiffEntry;
 import models.DiffEntry.diff_types;
 import models.FileDiff;
-import models.DiffEntry;
-import models.CommitFamily;
 import db.Resources.ChangeType;
 
 public abstract class DbConnection {
@@ -30,7 +28,9 @@ public abstract class DbConnection {
 	protected String branchID = null;
 	public Statement currentBatch;
 	public CallableStatement callableBatch;
-
+	private Queue<ExecutionItem> executionQueue = new ConcurrentLinkedQueue<ExecutionItem>();
+	private String dbName;
+	
 	protected DbConnection() 
 	{
 		try 
@@ -92,34 +92,12 @@ public abstract class DbConnection {
 	 */
 	public boolean exec(String sql)
 	{
-		try {
-			PreparedStatement s = conn.prepareStatement(sql);
-			s.execute();
-		}
-		catch (SQLException e)
-		{
-			e.printStackTrace();
-			return false;
-		}
-		return true;
+		return addExecutionItem( new ExecutionItem(sql,null));
 	}
 	
 	public boolean execPrepared(String sql, String[] params)
 	{
-		try {
-			PreparedStatement s = conn.prepareStatement(sql);
-			for (int i = 1;i <= params.length;i++)
-			{
-				s.setString(i, params[i-1]);
-			}
-			s.execute();
-		}
-		catch (SQLException e)
-		{
-			e.printStackTrace();
-			return false;
-		}
-		return true;
+		return addExecutionItem( new ExecutionItem(sql, params));
 	}
 	
 	/**
@@ -143,43 +121,6 @@ public abstract class DbConnection {
 		{
 			e.printStackTrace();
 			return null;
-		}
-	}
-	
-	/**
-	 * Connects to the given database.  
-	 * @param dbName
-	 * @return true if successful
-	 */
-	public boolean connect(String dbName)
-	{
-		try {
-			conn = DriverManager.getConnection(Resources.dbUrl + dbName.toLowerCase(), Resources.dbUser, Resources.dbPassword);
-			sr = new ScriptRunner(conn, false, true);
-			sr.setLogWriter(null);
-			currentBatch = conn.createStatement();
-		} 
-		catch (Exception e) 
-		{
-			e.printStackTrace();
-			return false;
-		}
-		return true;
-	}
-	
-	/**
-	 * Close all connection
-	 */
-	public boolean close()
-	{
-		try {
-			conn.close();
-			return true;
-		}
-		catch (SQLException e)
-		{
-			e.printStackTrace();
-			return false;
 		}
 	}
 
@@ -698,20 +639,9 @@ public abstract class DbConnection {
 	
 	public void insertOwnerRecord(String CommitId, String Author, String FileId, int ChangeStart, int ChangeEnd, ChangeType changeType)
 	{
-		try
-		{
-			PreparedStatement s = conn.prepareStatement(
-					"INSERT INTO owners values (?,?,?,'" + ChangeStart + "','" + ChangeEnd + "', ?)");
-			s.setString(1, CommitId);
-			s.setString(2, Author);
-			s.setString(3, FileId);
-			s.setString(4, changeType.toString());
-			currentBatch.addBatch(s.toString());
-		}
-		catch(SQLException e)
-		{
-			e.printStackTrace();
-		}
+		String sql = "INSERT INTO owners values (?,?,?,'" + ChangeStart + "','" + ChangeEnd + "', ?)";
+		String[] params = {CommitId, Author, FileId, changeType.toString()};
+		this.addExecutionItem(new ExecutionItem(sql, params));
 	}
 	
 	public Change getOwnerChangeBefore(String FileId, int CharStart, Timestamp CommitDate)
@@ -756,17 +686,96 @@ public abstract class DbConnection {
 			return null;
 		}
 	}
+		
+	public void setConnectionString(String dbName) {
+		this.dbName = dbName;
+	}
 	
-	public boolean execBatch() {
+	public boolean addExecutionItem(ExecutionItem ei) {
+		return this.executionQueue.add(ei);
+	}
+	
+	private Connection getConnection(String dbName) {
+		Connection conn = null;
 		try {
-			currentBatch.executeBatch();
-			currentBatch.clearBatch();
-			return true;
-		}
-		catch (SQLException e)
+			conn = DriverManager.getConnection(Resources.dbUrl + dbName.toLowerCase(), Resources.dbUser, Resources.dbPassword);
+			sr = new ScriptRunner(conn, false, true);
+			sr.setLogWriter(null);
+		} 
+		catch (Exception e) 
 		{
 			e.printStackTrace();
-			return false;
+		}
+		return conn;
+	}
+	
+	public void startWorkers(int numberOfThreads) {
+		for (int i = 0; i < numberOfThreads; ++i) {
+			QueueWorker qw = new QueueWorker(getConnection(this.dbName));
+			qw.start();
+			this.queueWorkers.add(qw);
+		}
+	}
+	
+	private class QueueWorker extends Thread {
+		private Connection conn = null;
+		
+		public QueueWorker(Connection connection) {
+			this.conn = connection;
+		}
+		
+		public void run() {
+			while (!executionQueue.isEmpty() && !stopWorkers) {
+				ExecutionItem itemToBeExecuted = executionQueue.poll();
+				if (itemToBeExecuted != null) {
+					try {
+						PreparedStatement s = conn.prepareStatement(itemToBeExecuted.query);
+						if (itemToBeExecuted.params != null) {
+							for (int i = 1;i <= itemToBeExecuted.params.length;i++)
+							{
+								s.setString(i, itemToBeExecuted.params[i-1]);
+							}
+						}
+						if (itemToBeExecuted.query.toLowerCase().startsWith("select")) {
+							itemToBeExecuted.resultSet = s.executeQuery();
+						} else {
+							s.execute();
+						}
+					}
+					catch (SQLException e) {
+						e.printStackTrace();
+					}
+				}
+			}
+		}
+	}
+	
+	private boolean stopWorkers = false;
+	private List<QueueWorker> queueWorkers = new ArrayList<QueueWorker>();
+	
+	public void stopWorkers() throws InterruptedException {
+		this.stopWorkers = true;
+		for (QueueWorker qWorker : queueWorkers) {
+			qWorker.join();
+		}
+	}
+	
+	public class ExecutionItem {		
+		private String query = null;
+		private String[] params = null;
+		private ResultSet resultSet = null;
+		
+		public ExecutionItem(String query, String[] params) {
+			this.query = query;
+			this.params = params;
+		}
+		
+		public boolean isDone() {
+			return resultSet != null;
+		}
+		
+		public ResultSet getResult() {
+			return this.resultSet;
 		}
 	}
 }
