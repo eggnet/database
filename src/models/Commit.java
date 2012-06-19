@@ -4,7 +4,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 
-import db.DbConnection.PreparedStatementExecutionItem;
+import db.util.PreparedStatementExecutionItem;
 
 public class Commit {
 	

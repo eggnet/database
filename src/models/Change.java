@@ -3,9 +3,9 @@ package models;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
-import db.DbConnection.PreparedStatementExecutionItem;
 import db.Resources;
 import db.Resources.ChangeType;
+import db.util.PreparedStatementExecutionItem;
 
 public class Change
 {	
