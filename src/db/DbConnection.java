@@ -25,6 +25,7 @@ public abstract class DbConnection {
 	protected String branchID = null;
 	private Queue<ExecutionItem> executionQueue = new ConcurrentLinkedQueue<ExecutionItem>();
 	private String dbName;
+	private int queueSize = 2;
 	
 	protected DbConnection() 
 	{
@@ -46,6 +47,23 @@ public abstract class DbConnection {
 		}
 	}
 
+	public void connect(String dbName) {
+		this.startWorkers(queueSize);
+	}
+	
+	public void connect(String dbName, int queueSize) {
+		this.queueSize = queueSize;
+		this.connect(dbName);
+	}
+	
+	public void close() {
+		try {
+			this.stopWorkers();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+	}
+	
 	public String getBranchID() {
 		return branchID;
 	}
@@ -380,7 +398,6 @@ public abstract class DbConnection {
 				{
 					familyList.add(new CommitFamily(family.getParentId(), family.getChildId()));
 					currentChild = family.getParentId();
-					break;
 				}
 			}
 			
@@ -646,6 +663,29 @@ public abstract class DbConnection {
 		}
 	}
 		
+	public Change getLatestOwnerChange(String fileId, int start, int end, Timestamp commitDate)
+	{
+		try
+		{
+			String sql = "SELECT commit_id, file_id, owner_id, char_start, char_end, change_type FROM owners natural join commits where file_id=? AND commit_date < ? AND "
+					+ "(branch_id=? OR branch_id is NULL) order by id desc";
+			IPSSetter[] params = {new StringSetter(1,fileId), new TimestampSetter(2, commitDate), new StringSetter(3, branchID)};
+			ExecutionItem ei = new ExecutionItem(sql, params);
+			this.addExecutionItem(ei);
+			ei.waitUntilExecuted();
+			ResultSet rs = ei.getResult();
+			if (!rs.next())
+				return null;
+			return new Change(rs.getString("owner_id"), rs.getString("commit_id"), Resources.ChangeType.valueOf(rs.getString("change_type")), rs.getString("file_id"), rs.getInt("char_start"), 
+						rs.getInt("char_end"));
+		}
+		catch (SQLException e)
+		{
+			e.printStackTrace();
+			return null;
+		}
+	}
+	
 	public void setConnectionString(String dbName) {
 		this.dbName = dbName;
 	}
@@ -716,6 +756,11 @@ public abstract class DbConnection {
 				}
 				if (executionQueue.isEmpty()) this.waiting(1);
 			}
+			try {
+				conn.close();
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
 		}
 	}
 	
@@ -744,6 +789,21 @@ public abstract class DbConnection {
 		
 		public PreparedStatement set(PreparedStatement ps) throws SQLException {
 			ps.setString(position, value);
+			return ps;
+		}
+	}
+	
+	public class TimestampSetter implements IPSSetter {
+		private Timestamp value;
+		private int position;
+
+		public TimestampSetter(int position, Timestamp value) {
+			this.value = value;
+			this.position = position;
+		}
+		
+		public PreparedStatement set(PreparedStatement ps) throws SQLException {
+			ps.setTimestamp(position, value);
 			return ps;
 		}
 	}
