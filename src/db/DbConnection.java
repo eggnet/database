@@ -60,12 +60,12 @@ public abstract class DbConnection {
 	}
 
 	/**
+	 * blocking
+	 * 
 	 * Should be called AFTER @see {@link #connect(String)}, as it also does 
 	 * a lookup on the branchID and sets it behind the scenes.
 	 * Also does a lookup in the branches table for 
 	 * @param branchName
-	 * 
-	 * blocking
 	 */
 	public synchronized void setBranchName(String branchName) {
 		this.branchName = branchName;
@@ -92,27 +92,27 @@ public abstract class DbConnection {
 	}
 	
 	/**
+	 * blocking
+	 * 
 	 * Executes the given query with escaped values in String[] params in place of
 	 * ? characters in sql.
 	 * @param sql ex. "SELECT * FROM something where my_column=?"
 	 * @param params ex. {"braden's work"}
 	 * @return Query ResultSet on success, null otherwise
 	 */
-	public ResultSet execPreparedQuery(String sql, String[] params)
+	@Deprecated
+	public synchronized ResultSet execPreparedQuery(String sql, String[] params)
 	{
-		try {
-			PreparedStatement s = conn.prepareStatement(sql);
-			for (int i = 1;i <= params.length;i++)
-			{
-				s.setString(i, params[i-1]);
+		ExecutionItem ei = new ExecutionItem(sql, params);
+		this.addExecutionItem(ei);
+		while (!ei.isDone()) {
+			try {
+				this.wait(1);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
 			}
-			return s.executeQuery();
 		}
-		catch (SQLException e)
-		{
-			e.printStackTrace();
-			return null;
-		}
+		return ei.resultSet;
 	}
 
 	public String getTimeStamp(String commit_id)
