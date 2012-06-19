@@ -11,8 +11,6 @@ import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-import org.hamcrest.core.IsSame;
-
 import models.Change;
 import models.Commit;
 import models.CommitDiff;
@@ -60,12 +58,13 @@ public abstract class DbConnection {
 		return this.connect(dbName);
 	}
 	
-	public void close() {
+	public boolean close() {
 		try {
 			this.stopWorkers();
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
+		return true;
 	}
 	
 	public String getBranchID() {
