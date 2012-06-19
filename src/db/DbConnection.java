@@ -50,6 +50,8 @@ public abstract class DbConnection {
 	}
 
 	public boolean connect(String dbName) {
+		this.dbName = dbName;
+		this.stopWorkers = false;
 		this.startWorkers(queueSize);
 		return true;
 	}
@@ -715,7 +717,7 @@ public abstract class DbConnection {
 		}
 		
 		public void run() {
-			while (!executionQueue.isEmpty() && !stopWorkers) {
+			while (!executionQueue.isEmpty() || !stopWorkers) {
 				AExecutionItem itemToBeExecuted = executionQueue.poll();
 				if (itemToBeExecuted != null) {
 					itemToBeExecuted.execute(this.conn);
@@ -833,6 +835,7 @@ public abstract class DbConnection {
 	public class PreparedCallExecutionItem extends AExecutionItem {
 		private String query;
 		private IPSSetter[] params;
+		private boolean wasExecuted = false;
 
 		PreparedCallExecutionItem(String query, IPSSetter[] params) {
 			this.query = query;
@@ -844,16 +847,29 @@ public abstract class DbConnection {
 			try {
 				CallableStatement s = conn.prepareCall(query);
 				for (IPSSetter setter : params) s = setter.set(s);
+				s.execute();
 			}
 			catch (SQLException e) {
+				CallableStatement s = null;
+				try {
+					s = conn.prepareCall(query);
+					if (params != null) {
+						for (IPSSetter setter : params) {
+							s = setter.set(s);
+						}
+					}
+				} catch (SQLException e1) {
+					e1.printStackTrace();
+				}
+				System.err.println(s.toString());				
 				e.printStackTrace();
-			}			
+			}
+			wasExecuted = true;
 		}
 
 		@Override
 		public boolean wasExecuted() {
-			// TODO Auto-generated method stub
-			return false;
+			return wasExecuted;
 		}
 		
 	}
@@ -884,6 +900,18 @@ public abstract class DbConnection {
 				}
 			}
 			catch (SQLException e) {
+				PreparedStatement s = null;
+				try {
+					s = conn.prepareCall(query);
+					if (params != null) {
+						for (IPSSetter setter : params) {
+							s = setter.set(s);
+						}
+					}
+				} catch (SQLException e1) {
+					e1.printStackTrace();
+				}
+				System.err.println(s.toString());
 				e.printStackTrace();
 			}
 			wasExecuted = true;
