@@ -11,7 +11,7 @@ public class PreparedCallExecutionItem extends AExecutionItem {
 	private ISetter[] params;
 	private boolean wasExecuted = false;
 
-	PreparedCallExecutionItem(String query, ISetter[] params) {
+	public PreparedCallExecutionItem(String query, ISetter[] params) {
 		this.query = query;
 		this.params = params;
 	}
