@@ -446,18 +446,14 @@ public abstract class DbConnection {
 			}
 			
 			// Get a random path from this commit to Root
+			// List must be ordered from newest to oldest
 			String currentChild = commitID;
 			for(CommitFamily family : rawFamilyList)
 			{
-				// Look for its parent
-				for(CommitFamily secondFamily : rawFamilyList)
+				if(family.getChildId().equals(currentChild))
 				{
-					if(secondFamily.getChildId().equals(currentChild))
-					{
-						familyList.add(new CommitFamily(secondFamily.getParentId(), secondFamily.getChildId()));
-						currentChild = secondFamily.getParentId();
-						break;
-					}
+					familyList.add(new CommitFamily(family.getParentId(), family.getChildId()));
+					currentChild = family.getParentId();
 				}
 			}
 			
