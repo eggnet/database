@@ -1,4 +1,6 @@
 package db;
+import java.io.IOException;
+import java.io.Reader;
 import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -21,7 +23,6 @@ import models.FileDiff;
 import db.Resources.ChangeType;
 
 public abstract class DbConnection {
-	protected ScriptRunner sr;
 	protected String branchName = null;
 	protected String branchID = null;
 	private Queue<AExecutionItem> executionQueue = new ConcurrentLinkedQueue<AExecutionItem>();
@@ -67,6 +68,14 @@ public abstract class DbConnection {
 		return true;
 	}
 	
+	public void runScript(Reader isr) throws IOException, SQLException {
+		Connection conn = getConnection(this.dbName);
+		ScriptRunner sr = new ScriptRunner(conn, false, true);
+		sr.setLogWriter(null);
+		sr.runScript(isr);
+		conn.close();
+	}
+	
 	public String getBranchID() {
 		return branchID;
 	}
@@ -79,6 +88,8 @@ public abstract class DbConnection {
 		return branchName;
 	}
 
+	public void execBatch() {}
+	
 	/**
 	 * blocking
 	 * 
@@ -672,8 +683,6 @@ public abstract class DbConnection {
 		Connection conn = null;
 		try {
 			conn = DriverManager.getConnection(Resources.dbUrl + dbName.toLowerCase(), Resources.dbUser, Resources.dbPassword);
-			sr = new ScriptRunner(conn, false, true);
-			sr.setLogWriter(null);
 		} 
 		catch (Exception e) 
 		{
