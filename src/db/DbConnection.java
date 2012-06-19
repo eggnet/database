@@ -1,11 +1,9 @@
 package db;
-import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,8 +24,6 @@ public abstract class DbConnection {
 	public Connection conn = null;
 	protected String branchName = null;
 	protected String branchID = null;
-	public Statement currentBatch;
-	public CallableStatement callableBatch;
 	private Queue<ExecutionItem> executionQueue = new ConcurrentLinkedQueue<ExecutionItem>();
 	private String dbName;
 	
@@ -68,36 +64,31 @@ public abstract class DbConnection {
 	 * a lookup on the branchID and sets it behind the scenes.
 	 * Also does a lookup in the branches table for 
 	 * @param branchName
+	 * 
+	 * blocking
 	 */
-	public void setBranchName(String branchName) {
+	public synchronized void setBranchName(String branchName) {
 		this.branchName = branchName;
 		try
 		{
+			String query = "SELECT branch_id from branches where branch_name ~ ? LIMIT 1";
 			String[] params = {branchName};
-			ResultSet rs = this.execPreparedQuery("SELECT branch_id from branches where branch_name ~ ? LIMIT 1", params);
-			rs.next();
-			setBranchID(rs.getString(1));
+			ExecutionItem ei = new ExecutionItem(query, params);
+			this.addExecutionItem(ei);
+			while (!ei.isDone()) {
+				try {
+					this.wait(1);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				} 
+			}
+			ei.resultSet.next();
+			setBranchID(ei.resultSet.getString(1));
 		}
 		catch (SQLException e)
 		{
 			e.printStackTrace();
 		}
-	}
-	
-	/**
-	 * Executes a string of SQL on the current database
-	 * NOTE: this assumes your sql is valid.
-	 * @param sql
-	 * @return true if successful
-	 */
-	public boolean exec(String sql)
-	{
-		return addExecutionItem( new ExecutionItem(sql,null));
-	}
-	
-	public boolean execPrepared(String sql, String[] params)
-	{
-		return addExecutionItem( new ExecutionItem(sql, params));
 	}
 	
 	/**
