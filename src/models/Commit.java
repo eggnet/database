@@ -1,6 +1,10 @@
 package models;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Timestamp;
+
+import db.DbConnection.PreparedStatementExecutionItem;
 
 public class Commit {
 	
@@ -12,6 +16,8 @@ public class Commit {
 	private Timestamp commit_date;
 
 	private String branch_id;
+	private PreparedStatementExecutionItem executionItem;
+	private boolean wasRetrieved = false;
 	
 	public Commit() { }
 
@@ -38,7 +44,12 @@ public class Commit {
 		this.branch_id = branch_id;
 	}
 
+	public Commit(PreparedStatementExecutionItem ei) {
+		this.executionItem = ei;
+	}
+	
 	public String getBranch_id() {
+		retrieve();
 		return branch_id;
 	}
 	
@@ -47,6 +58,7 @@ public class Commit {
 	}
 
 	public int getId() {
+		retrieve();
 		return id;
 	}
 
@@ -55,6 +67,7 @@ public class Commit {
 	}
 
 	public String getCommit_id() {
+		retrieve();
 		return commit_id;
 	}
 
@@ -63,6 +76,7 @@ public class Commit {
 	}
 
 	public String getAuthor() {
+		retrieve();
 		return author;
 	}
 
@@ -71,6 +85,7 @@ public class Commit {
 	}
 
 	public String getAuthor_email() {
+		retrieve();
 		return author_email;
 	}
 
@@ -79,6 +94,7 @@ public class Commit {
 	}
 
 	public String getComment() {
+		retrieve();
 		return comment;
 	}
 
@@ -87,10 +103,32 @@ public class Commit {
 	}
 
 	public Timestamp getCommit_date() {
+		retrieve();
 		return commit_date;
 	}
 
 	public void setCommit_date(Timestamp commit_date) {
 		this.commit_date = commit_date;
+	}
+	
+	private void retrieve() {
+		if (!wasRetrieved ) {
+			this.executionItem.waitUntilExecuted();
+			wasRetrieved = true;
+			ResultSet rs = this.executionItem.getResult();
+			
+			try {
+				if (rs.next()) {
+					this.commit_id = rs.getString("commit_id");
+					this.author = rs.getString("author");
+					this.author_email = rs.getString("author_email");
+					this.comment = rs.getString("comments");
+					this.commit_date = rs.getTimestamp("commit_date");
+					this.branch_id = rs.getString("branch_id");
+				}
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+		}
 	}
 }

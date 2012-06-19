@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+import org.hamcrest.core.IsSame;
+
 import models.Change;
 import models.Commit;
 import models.CommitDiff;
@@ -621,21 +623,11 @@ public abstract class DbConnection {
 	
 	public Commit getCommit(String CommitId)
 	{
-		try
-		{
-			String sql = "SELECT commit_id, author, author_email, comments, commit_date, branch_id FROM Commits where commit_id=? and (branch_id=? or branch_id is NULL);";
-			String[] parms = {CommitId, this.branchID};
-			ResultSet rs = execPreparedQuery(sql, parms);
-			if (!rs.next())
-				return null;
-			else
-				return new Commit(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getTimestamp(5), rs.getString(6));
-		}
-		catch (SQLException e)
-		{
-			e.printStackTrace();
-			return null;
-		}
+		String sql = "SELECT commit_id, author, author_email, comments, commit_date, branch_id FROM Commits where commit_id=? and (branch_id=? or branch_id is NULL);";
+		IPSSetter[] params = {new StringSetter(1,CommitId), new StringSetter(2,this.branchID)};
+		PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, params);
+		this.addExecutionItem(ei);
+		return new Commit(ei);
 	}
 	
 	public void insertOwnerRecord(String CommitId, String Author, String FileId, int ChangeStart, int ChangeEnd, ChangeType changeType)
