@@ -754,7 +754,29 @@ public abstract class DbConnection {
 		@Override
 		public CallableStatement set(CallableStatement ps) throws SQLException {
 			ps.setString(position, value);
-			return null;
+			return ps;
+		}
+	}
+	
+	public class IntSetter implements IPSSetter {
+		private int value;
+		private int position;
+		
+		public IntSetter(int position, int value) {
+			this.value = value;
+			this.position = position;
+		}
+		
+		@Override
+		public PreparedStatement set(PreparedStatement ps) throws SQLException {
+			ps.setInt(position, value);
+			return ps;
+		}
+		
+		@Override
+		public CallableStatement set(CallableStatement ps) throws SQLException {
+			ps.setInt(position, value);
+			return ps;
 		}
 	}
 	
@@ -776,7 +798,7 @@ public abstract class DbConnection {
 		@Override
 		public CallableStatement set(CallableStatement ps) throws SQLException {
 			ps.setTimestamp(position, value);
-			return null;
+			return ps;
 		}
 	}
 	
