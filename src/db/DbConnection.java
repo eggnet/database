@@ -1,4 +1,5 @@
 package db;
+import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -23,7 +24,7 @@ public abstract class DbConnection {
 	protected ScriptRunner sr;
 	protected String branchName = null;
 	protected String branchID = null;
-	private Queue<ExecutionItem> executionQueue = new ConcurrentLinkedQueue<ExecutionItem>();
+	private Queue<AExecutionItem> executionQueue = new ConcurrentLinkedQueue<AExecutionItem>();
 	private String dbName;
 	private int queueSize = 2;
 	
@@ -47,13 +48,14 @@ public abstract class DbConnection {
 		}
 	}
 
-	public void connect(String dbName) {
+	public boolean connect(String dbName) {
 		this.startWorkers(queueSize);
+		return true;
 	}
 	
-	public void connect(String dbName, int queueSize) {
+	public boolean connect(String dbName, int queueSize) {
 		this.queueSize = queueSize;
-		this.connect(dbName);
+		return this.connect(dbName);
 	}
 	
 	public void close() {
@@ -90,7 +92,7 @@ public abstract class DbConnection {
 		{
 			String query = "SELECT branch_id from branches where branch_name ~ ? LIMIT 1";
 			IPSSetter[] params = {new StringSetter(1,branchName)};
-			ExecutionItem ei = new ExecutionItem(query, params);
+			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(query, params);
 			this.addExecutionItem(ei);
 			ei.waitUntilExecuted();
 			ei.resultSet.next();
@@ -121,7 +123,7 @@ public abstract class DbConnection {
 				ps[i] = new StringSetter(i+1,params[i]);
 			}
 		}
-		ExecutionItem ei = new ExecutionItem(sql, ps);
+		PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, ps);
 		this.addExecutionItem(ei);
 		ei.waitUntilExecuted();
 		return ei.resultSet;
@@ -640,57 +642,34 @@ public abstract class DbConnection {
 	{
 		String sql = "INSERT INTO owners values (?,?,?,'" + ChangeStart + "','" + ChangeEnd + "', ?)";
 		IPSSetter[] params = {new StringSetter(1,CommitId), new StringSetter(2, Author), new StringSetter(3, FileId), new StringSetter(4, changeType.toString())};
-		this.addExecutionItem(new ExecutionItem(sql, params));
+		this.addExecutionItem(new PreparedStatementExecutionItem(sql, params));
 	}
 	
 	public Change getOwnerChangeBefore(String FileId, int CharStart, Timestamp CommitDate)
 	{
-		try 
-		{
-			String sql = "SELECT commit_id, file_id, owner_id, char_start, char_end, change_type FROM owners natural join commits where file_id=? and commit_id=?" +
-					"and char_start='" + CharStart + "' and (branch_id=? OR branch_id is NULL) and commit_date < "+ CommitDate + " order by id desc";
-			String[] parms = {FileId, branchID};
-			ResultSet rs = execPreparedQuery(sql, parms);
-			if (!rs.next())
-				return null;
-			return new Change(rs.getString("owner_id"), rs.getString("commit_id"), Resources.ChangeType.valueOf(rs.getString("change_type")), rs.getString("file_id"), rs.getInt("char_start"), 
-						rs.getInt("char_end"));
-		}
-		catch(SQLException e) 
-		{
-			e.printStackTrace();
-			return null;
-		}
+		String sql = "SELECT commit_id, file_id, owner_id, char_start, char_end, change_type FROM owners natural join commits where file_id=? and commit_id=?" +
+				"and char_start='" + CharStart + "' and (branch_id=? OR branch_id is NULL) and commit_date < "+ CommitDate + " order by id desc";
+		IPSSetter[] params = {new StringSetter(1,FileId), new StringSetter(2,branchID)};
+		PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, params);
+		this.addExecutionItem(ei);
+		return new Change(ei);
 	}
 		
 	public Change getLatestOwnerChange(String fileId, int start, int end, Timestamp commitDate)
 	{
-		try
-		{
-			String sql = "SELECT commit_id, file_id, owner_id, char_start, char_end, change_type FROM owners natural join commits where file_id=? AND commit_date < ? AND "
-					+ "(branch_id=? OR branch_id is NULL) order by id desc";
-			IPSSetter[] params = {new StringSetter(1,fileId), new TimestampSetter(2, commitDate), new StringSetter(3, branchID)};
-			ExecutionItem ei = new ExecutionItem(sql, params);
-			this.addExecutionItem(ei);
-			ei.waitUntilExecuted();
-			ResultSet rs = ei.getResult();
-			if (!rs.next())
-				return null;
-			return new Change(rs.getString("owner_id"), rs.getString("commit_id"), Resources.ChangeType.valueOf(rs.getString("change_type")), rs.getString("file_id"), rs.getInt("char_start"), 
-						rs.getInt("char_end"));
-		}
-		catch (SQLException e)
-		{
-			e.printStackTrace();
-			return null;
-		}
+		String sql = "SELECT commit_id, file_id, owner_id, char_start, char_end, change_type FROM owners natural join commits where file_id=? AND commit_date < ? AND "
+				+ "(branch_id=? OR branch_id is NULL) order by id desc";
+		IPSSetter[] params = {new StringSetter(1,fileId), new TimestampSetter(2, commitDate), new StringSetter(3, branchID)};
+		PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, params);
+		this.addExecutionItem(ei);
+		return new Change(ei);
 	}
 	
 	public void setConnectionString(String dbName) {
 		this.dbName = dbName;
 	}
 	
-	public boolean addExecutionItem(ExecutionItem ei) {
+	public boolean addExecutionItem(AExecutionItem ei) {
 		return this.executionQueue.add(ei);
 	}
 	
@@ -733,26 +712,9 @@ public abstract class DbConnection {
 		
 		public void run() {
 			while (!executionQueue.isEmpty() && !stopWorkers) {
-				ExecutionItem itemToBeExecuted = executionQueue.poll();
+				AExecutionItem itemToBeExecuted = executionQueue.poll();
 				if (itemToBeExecuted != null) {
-					try {
-						PreparedStatement s = conn.prepareStatement(itemToBeExecuted.query);
-						if (itemToBeExecuted.params != null) {
-							for (IPSSetter setter : itemToBeExecuted.params)
-							{
-								s = setter.set(s);
-							}
-						}
-						if (itemToBeExecuted.query.toLowerCase().startsWith("select")) {
-							itemToBeExecuted.resultSet = s.executeQuery();
-						} else {
-							s.execute();
-						}
-					}
-					catch (SQLException e) {
-						e.printStackTrace();
-					}
-					itemToBeExecuted.wasExecuted = true;
+					itemToBeExecuted.execute(this.conn);
 				}
 				if (executionQueue.isEmpty()) this.waiting(1);
 			}
@@ -776,6 +738,7 @@ public abstract class DbConnection {
 	
 	public interface IPSSetter {
 		public PreparedStatement set(PreparedStatement ps) throws SQLException;
+		public CallableStatement set(CallableStatement ps) throws SQLException;
 	}
 	
 	public class StringSetter implements IPSSetter {
@@ -787,9 +750,16 @@ public abstract class DbConnection {
 			this.value = value;
 		}
 		
+		@Override
 		public PreparedStatement set(PreparedStatement ps) throws SQLException {
 			ps.setString(position, value);
 			return ps;
+		}
+
+		@Override
+		public CallableStatement set(CallableStatement ps) throws SQLException {
+			ps.setString(position, value);
+			return null;
 		}
 	}
 	
@@ -802,21 +772,95 @@ public abstract class DbConnection {
 			this.position = position;
 		}
 		
+		@Override
 		public PreparedStatement set(PreparedStatement ps) throws SQLException {
 			ps.setTimestamp(position, value);
 			return ps;
 		}
+		
+		@Override
+		public CallableStatement set(CallableStatement ps) throws SQLException {
+			ps.setTimestamp(position, value);
+			return null;
+		}
 	}
 	
-	public class ExecutionItem {		
+	public abstract class AExecutionItem {
+		public abstract void execute(Connection conn);
+		
+		/**
+		 * blocking
+		 */
+		public synchronized void waitUntilExecuted() {
+			while (!wasExecuted()) {
+				try {
+					this.wait(1);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+		
+		public abstract boolean wasExecuted();
+	}
+	
+	public class PreparedCallExecutionItem extends AExecutionItem {
+		private String query;
+		private IPSSetter[] params;
+
+		PreparedCallExecutionItem(String query, IPSSetter[] params) {
+			this.query = query;
+			this.params = params;
+		}
+		
+		@Override
+		public void execute(Connection conn) {
+			try {
+				CallableStatement s = conn.prepareCall(query);
+				for (IPSSetter setter : params) s = setter.set(s);
+			}
+			catch (SQLException e) {
+				e.printStackTrace();
+			}			
+		}
+
+		@Override
+		public boolean wasExecuted() {
+			// TODO Auto-generated method stub
+			return false;
+		}
+		
+	}
+	
+	public class PreparedStatementExecutionItem extends AExecutionItem {		
 		private String query = null;
 		private IPSSetter[] params = null;
 		private ResultSet resultSet = null;
 		private boolean wasExecuted = false;
 		
-		public ExecutionItem(String query, IPSSetter[] params) {
+		public PreparedStatementExecutionItem(String query, IPSSetter[] params) {
 			this.query = query;
 			this.params = params;
+		}
+		
+		public void execute(Connection conn) {
+			try {
+				PreparedStatement s = conn.prepareStatement(query);
+				if (params != null) {
+					for (IPSSetter setter : params) {
+						s = setter.set(s);
+					}
+				}
+				if (query.toLowerCase().startsWith("select")) {
+					resultSet = s.executeQuery();
+				} else {
+					s.execute();
+				}
+			}
+			catch (SQLException e) {
+				e.printStackTrace();
+			}
+			wasExecuted = true;
 		}
 		
 		public boolean wasExecuted() {
@@ -827,17 +871,6 @@ public abstract class DbConnection {
 			return this.resultSet;
 		}
 		
-		/**
-		 * blocking
-		 */
-		public synchronized void waitUntilExecuted() {
-			while (!wasExecuted) {
-				try {
-					this.wait(1);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				}
-			}
-		}
+
 	}
 }

@@ -1,5 +1,9 @@
 package models;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+import db.DbConnection.PreparedStatementExecutionItem;
 import db.Resources;
 import db.Resources.ChangeType;
 
@@ -11,6 +15,8 @@ public class Change
 	protected int					CharStart;
 	protected int					CharEnd;
 	protected Resources.ChangeType	ChangeType;
+	private PreparedStatementExecutionItem executionItem;
+	private boolean wasRetrieved = false;
 
 	public Change()
 	{ }
@@ -36,8 +42,13 @@ public class Change
 		ChangeType = changeType;
 	}
 
+	public Change(PreparedStatementExecutionItem ei) {
+		this.executionItem = ei;
+	}
+		
 	public String getCommitId()
 	{
+		retrieve();
 		return CommitId;
 	}
 
@@ -48,6 +59,7 @@ public class Change
 
 	public String getOwnerId()
 	{
+		retrieve();
 		return OwnerId;
 	}
 
@@ -58,6 +70,7 @@ public class Change
 
 	public String getFileId()
 	{
+		retrieve();
 		return FileId;
 	}
 
@@ -68,6 +81,7 @@ public class Change
 
 	public int getCharStart()
 	{
+		retrieve();
 		return CharStart;
 	}
 
@@ -78,6 +92,7 @@ public class Change
 
 	public int getCharEnd()
 	{
+		retrieve();
 		return CharEnd;
 	}
 
@@ -88,11 +103,32 @@ public class Change
 
 	public Resources.ChangeType getChangeType()
 	{
+		retrieve();
 		return ChangeType;
 	}
 
 	public void setChangeType(Resources.ChangeType changeType)
 	{
 		ChangeType = changeType;
+	}
+	
+	private void retrieve() {
+		if (!wasRetrieved) {
+			this.executionItem.waitUntilExecuted();
+			wasRetrieved = true;
+			ResultSet rs = this.executionItem.getResult();
+			try {
+				if (rs.next()) {
+					CommitId = rs.getString("commit_id");
+					OwnerId = rs.getString("owner_id");
+					FileId = rs.getString("file_id");
+					CharStart = rs.getInt("char_start");
+					CharEnd = rs.getInt("char_end");
+					ChangeType = Resources.ChangeType.valueOf(rs.getString("change_type"));
+				}
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+		}
 	}
 }
