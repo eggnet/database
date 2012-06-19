@@ -526,10 +526,12 @@ public abstract class DbConnection {
 			List<DiffEntry> diffList = new ArrayList<DiffEntry>();
 			String sql = "SELECT file_id, new_commit_id, old_commit_id, diff_text, char_start, char_end, diff_type from file_diffs where " +
 						"file_id=? and old_commit_id=? and new_commit_id=?";
-
-			String[] params = {fileID, oldCommitID, newCommitID};
-			ResultSet rs = execPreparedQuery(sql, params);
+			IPSSetter[] params = {new StringSetter(1, fileID), new StringSetter(2, oldCommitID), new StringSetter(3, newCommitID)};
+			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, params);
+			this.addExecutionItem(ei);
+			ei.waitUntilExecuted();
 			
+			ResultSet rs = ei.getResult();
 			while(rs.next())
 			{
 				String newCommitId  = rs.getString("new_commit_id");
@@ -607,8 +609,10 @@ public abstract class DbConnection {
 		try 
 		{
 			String sql = "Select commit_id from commits order by id desc;";
-			String[] parms = {};
-			ResultSet rs = execPreparedQuery(sql, parms);
+			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, null);
+			this.addExecutionItem(ei);
+			ei.waitUntilExecuted();
+			ResultSet rs = ei.getResult();
 			if (rs.next())
 				return rs.getString(1);
 			else
