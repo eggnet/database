@@ -21,7 +21,6 @@ import db.Resources.ChangeType;
 
 public abstract class DbConnection {
 	protected ScriptRunner sr;
-	public Connection conn = null;
 	protected String branchName = null;
 	protected String branchID = null;
 	private Queue<ExecutionItem> executionQueue = new ConcurrentLinkedQueue<ExecutionItem>();
@@ -72,7 +71,7 @@ public abstract class DbConnection {
 		try
 		{
 			String query = "SELECT branch_id from branches where branch_name ~ ? LIMIT 1";
-			String[] params = {branchName};
+			IPSSetter[] params = {new StringSetter(1,branchName)};
 			ExecutionItem ei = new ExecutionItem(query, params);
 			this.addExecutionItem(ei);
 			while (!ei.isDone()) {
@@ -103,7 +102,14 @@ public abstract class DbConnection {
 	@Deprecated
 	public synchronized ResultSet execPreparedQuery(String sql, String[] params)
 	{
-		ExecutionItem ei = new ExecutionItem(sql, params);
+		IPSSetter[] ps = null;
+		if (params != null && params.length > 0) {
+			ps = new IPSSetter[params.length];
+			for (int i = 0; i < params.length; ++i) {
+				ps[i] = new StringSetter(i+1,params[i]);
+			}
+		}
+		ExecutionItem ei = new ExecutionItem(sql, ps);
 		this.addExecutionItem(ei);
 		while (!ei.isDone()) {
 			try {
@@ -631,7 +637,7 @@ public abstract class DbConnection {
 	public void insertOwnerRecord(String CommitId, String Author, String FileId, int ChangeStart, int ChangeEnd, ChangeType changeType)
 	{
 		String sql = "INSERT INTO owners values (?,?,?,'" + ChangeStart + "','" + ChangeEnd + "', ?)";
-		String[] params = {CommitId, Author, FileId, changeType.toString()};
+		IPSSetter[] params = {new StringSetter(1,CommitId), new StringSetter(2, Author), new StringSetter(3, FileId), new StringSetter(4, changeType.toString())};
 		this.addExecutionItem(new ExecutionItem(sql, params));
 	}
 	
@@ -649,29 +655,6 @@ public abstract class DbConnection {
 						rs.getInt("char_end"));
 		}
 		catch(SQLException e) 
-		{
-			e.printStackTrace();
-			return null;
-		}
-	}
-
-	public Change getLatestOwnerChange(String fileId, int start, int end, Timestamp commitDate)
-	{
-		try
-		{
-			String sql = "SELECT commit_id, file_id, owner_id, char_start, char_end, change_type FROM owners natural join commits where file_id=? AND commit_date < ? AND "
-					+ "(branch_id=? OR branch_id is NULL) order by id desc";
-			PreparedStatement stmt = conn.prepareStatement(sql);
-			stmt.setString(1, fileId);
-			stmt.setTimestamp(2, commitDate);
-			stmt.setString(3, branchID);
-			ResultSet rs = stmt.executeQuery();
-			if (!rs.next())
-				return null;
-			return new Change(rs.getString("owner_id"), rs.getString("commit_id"), Resources.ChangeType.valueOf(rs.getString("change_type")), rs.getString("file_id"), rs.getInt("char_start"), 
-						rs.getInt("char_end"));
-		}
-		catch (SQLException e)
 		{
 			e.printStackTrace();
 			return null;
@@ -722,9 +705,9 @@ public abstract class DbConnection {
 					try {
 						PreparedStatement s = conn.prepareStatement(itemToBeExecuted.query);
 						if (itemToBeExecuted.params != null) {
-							for (int i = 1;i <= itemToBeExecuted.params.length;i++)
+							for (IPSSetter setter : itemToBeExecuted.params)
 							{
-								s.setString(i, itemToBeExecuted.params[i-1]);
+								s = setter.set(s);
 							}
 						}
 						if (itemToBeExecuted.query.toLowerCase().startsWith("select")) {
@@ -751,12 +734,31 @@ public abstract class DbConnection {
 		}
 	}
 	
+	public interface IPSSetter {
+		public PreparedStatement set(PreparedStatement ps) throws SQLException;
+	}
+	
+	public class StringSetter implements IPSSetter {
+		private int position;
+		private String value;
+
+		public StringSetter(int position, String value) {
+			this.position = position;
+			this.value = value;
+		}
+		
+		public PreparedStatement set(PreparedStatement ps) throws SQLException {
+			ps.setString(position, value);
+			return ps;
+		}
+	}
+	
 	public class ExecutionItem {		
 		private String query = null;
-		private String[] params = null;
+		private IPSSetter[] params = null;
 		private ResultSet resultSet = null;
 		
-		public ExecutionItem(String query, String[] params) {
+		public ExecutionItem(String query, IPSSetter[] params) {
 			this.query = query;
 			this.params = params;
 		}
