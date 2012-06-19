@@ -683,6 +683,14 @@ public abstract class DbConnection {
 			this.conn = connection;
 		}
 		
+		private synchronized void waiting(long ms) {
+			try {
+				this.wait(ms);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+		}
+		
 		public void run() {
 			while (!executionQueue.isEmpty() && !stopWorkers) {
 				ExecutionItem itemToBeExecuted = executionQueue.poll();
@@ -704,7 +712,9 @@ public abstract class DbConnection {
 					catch (SQLException e) {
 						e.printStackTrace();
 					}
+					itemToBeExecuted.wasExecuted = true;
 				}
+				if (executionQueue.isEmpty()) this.waiting(1);
 			}
 		}
 	}
