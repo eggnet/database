@@ -66,7 +66,7 @@ public abstract class DbConnection {
 	 * Also does a lookup in the branches table for 
 	 * @param branchName
 	 */
-	public synchronized void setBranchName(String branchName) {
+	public void setBranchName(String branchName) {
 		this.branchName = branchName;
 		try
 		{
@@ -74,13 +74,7 @@ public abstract class DbConnection {
 			IPSSetter[] params = {new StringSetter(1,branchName)};
 			ExecutionItem ei = new ExecutionItem(query, params);
 			this.addExecutionItem(ei);
-			while (!ei.isDone()) {
-				try {
-					this.wait(1);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				} 
-			}
+			ei.waitUntilExecuted();
 			ei.resultSet.next();
 			setBranchID(ei.resultSet.getString(1));
 		}
@@ -100,7 +94,7 @@ public abstract class DbConnection {
 	 * @return Query ResultSet on success, null otherwise
 	 */
 	@Deprecated
-	public synchronized ResultSet execPreparedQuery(String sql, String[] params)
+	public ResultSet execPreparedQuery(String sql, String[] params)
 	{
 		IPSSetter[] ps = null;
 		if (params != null && params.length > 0) {
@@ -111,13 +105,7 @@ public abstract class DbConnection {
 		}
 		ExecutionItem ei = new ExecutionItem(sql, ps);
 		this.addExecutionItem(ei);
-		while (!ei.isDone()) {
-			try {
-				this.wait(1);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
-		}
+		ei.waitUntilExecuted();
 		return ei.resultSet;
 	}
 
@@ -385,17 +373,14 @@ public abstract class DbConnection {
 			
 			// Get a random path from this commit to Root
 			String currentChild = commitID;
+			// Look for its parent
 			for(CommitFamily family : rawFamilyList)
 			{
-				// Look for its parent
-				for(CommitFamily secondFamily : rawFamilyList)
+				if(family.getChildId().equals(currentChild))
 				{
-					if(secondFamily.getChildId().equals(currentChild))
-					{
-						familyList.add(new CommitFamily(secondFamily.getParentId(), secondFamily.getChildId()));
-						currentChild = secondFamily.getParentId();
-						break;
-					}
+					familyList.add(new CommitFamily(family.getParentId(), family.getChildId()));
+					currentChild = family.getParentId();
+					break;
 				}
 			}
 			
@@ -757,18 +742,32 @@ public abstract class DbConnection {
 		private String query = null;
 		private IPSSetter[] params = null;
 		private ResultSet resultSet = null;
+		private boolean wasExecuted = false;
 		
 		public ExecutionItem(String query, IPSSetter[] params) {
 			this.query = query;
 			this.params = params;
 		}
 		
-		public boolean isDone() {
-			return resultSet != null;
+		public boolean wasExecuted() {
+			return wasExecuted;
 		}
 		
 		public ResultSet getResult() {
 			return this.resultSet;
+		}
+		
+		/**
+		 * blocking
+		 */
+		public synchronized void waitUntilExecuted() {
+			while (!wasExecuted) {
+				try {
+					this.wait(1);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
 		}
 	}
 }
