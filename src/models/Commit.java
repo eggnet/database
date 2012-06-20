@@ -19,7 +19,9 @@ public class Commit {
 	private PreparedStatementExecutionItem executionItem;
 	private boolean wasRetrieved = false;
 	
-	public Commit() { }
+	public Commit() { 
+		wasRetrieved = true;
+	}
 
 	public Commit(int id, String commit_id, String author, String author_email,
 			String comment, Timestamp commit_date, String branch_id)
@@ -31,6 +33,8 @@ public class Commit {
 		this.comment = comment;
 		this.commit_date = commit_date;
 		this.branch_id = branch_id;
+		
+		wasRetrieved = true;
 	}
 
 	public Commit(String commit_id, String author, String author_email,
@@ -42,6 +46,8 @@ public class Commit {
 		this.comment = comment;
 		this.commit_date = commit_date;
 		this.branch_id = branch_id;
+		
+		wasRetrieved = true;
 	}
 
 	public Commit(PreparedStatementExecutionItem ei) {

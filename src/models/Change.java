@@ -19,7 +19,9 @@ public class Change
 	private boolean wasRetrieved = false;
 
 	public Change()
-	{ }
+	{
+		wasRetrieved = true;
+	}
 	
 	public Change(Change other)
 	{
@@ -29,6 +31,8 @@ public class Change
 		CharStart = other.getCharStart();
 		CharEnd = other.getCharEnd();
 		ChangeType = other.getChangeType();
+		
+		wasRetrieved = true;
 	}
 	
 	public Change(String ownerId, String commitId, ChangeType changeType, String fileId, int charStart, int charEnd)
@@ -40,6 +44,8 @@ public class Change
 		CharStart = charStart;
 		CharEnd = charEnd;
 		ChangeType = changeType;
+		
+		wasRetrieved = true;
 	}
 
 	public Change(PreparedStatementExecutionItem ei) {
