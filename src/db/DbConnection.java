@@ -413,6 +413,7 @@ public abstract class DbConnection {
 			}
 			
 			// Get a random path from this commit to Root
+			// List must be ordered from newest to oldest
 			String currentChild = commitID;
 			// Look for its parent
 			for(CommitFamily family : rawFamilyList)
