@@ -53,6 +53,50 @@ public interface ISetter {
 		}
 	}
 	
+	public class FloatSetter implements ISetter {
+		private float value;
+		private int position;
+		
+		public FloatSetter(int position, float value) {
+			this.value = value;
+			this.position = position;
+		}
+		
+		@Override
+		public PreparedStatement set(PreparedStatement ps) throws SQLException {
+			ps.setFloat(position, value);
+			return ps;
+		}
+		
+		@Override
+		public CallableStatement set(CallableStatement ps) throws SQLException {
+			ps.setFloat(position, value);
+			return ps;
+		}
+	}
+	
+	public class BooleanSetter implements ISetter {
+		private boolean value;
+		private int position;
+		
+		public BooleanSetter(int position, boolean value) {
+			this.value = value;
+			this.position = position;
+		}
+		
+		@Override
+		public PreparedStatement set(PreparedStatement ps) throws SQLException {
+			ps.setBoolean(position, value);
+			return ps;
+		}
+		
+		@Override
+		public CallableStatement set(CallableStatement ps) throws SQLException {
+			ps.setBoolean(position, value);
+			return ps;
+		}
+	}
+	
 	public class TimestampSetter implements ISetter {
 		private Timestamp value;
 		private int position;
