@@ -32,7 +32,7 @@ public abstract class DbConnection {
 	
 	private Queue<AExecutionItem> executionQueue = new ConcurrentLinkedQueue<AExecutionItem>();
 	private String dbName;
-	private int queueSize = 2;
+	private int queueSize = 4;
 	private boolean stopWorkers = false;
 	private List<QueueWorker> queueWorkers = new ArrayList<QueueWorker>();
 	
@@ -415,13 +415,19 @@ public abstract class DbConnection {
 			// Get a random path from this commit to Root
 			// List must be ordered from newest to oldest
 			String currentChild = commitID;
-			// Look for its parent
+			// MAGICAL LOOP OF GOODNESS - DO NOT DELETE ADRIAN!!!!
+			// IT'S POWERS ARE KNOWN FAR AND WIDE
 			for(CommitFamily family : rawFamilyList)
 			{
-				if(family.getChildId().equals(currentChild))
+				// Look for its parent
+				for(CommitFamily secondFamily : rawFamilyList)
 				{
-					familyList.add(new CommitFamily(family.getParentId(), family.getChildId()));
-					currentChild = family.getParentId();
+					if(secondFamily.getChildId().equals(currentChild))
+					{
+						familyList.add(new CommitFamily(secondFamily.getParentId(), secondFamily.getChildId()));
+						currentChild = secondFamily.getParentId();
+						break;
+					}
 				}
 			}
 			
