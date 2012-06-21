@@ -35,6 +35,7 @@ public abstract class DbConnection {
 	private int queueSize = 4;
 	private boolean stopWorkers = false;
 	private List<QueueWorker> queueWorkers = new ArrayList<QueueWorker>();
+	private int	queueLimit = 10000;
 	
 	protected DbConnection() 
 	{
@@ -63,9 +64,14 @@ public abstract class DbConnection {
 		return true;
 	}
 	
-	public boolean connect(String dbName, int queueSize) {
-		this.queueSize = queueSize;
+	public boolean connect(String dbName, int numQueueWorkers) {
+		this.queueSize = numQueueWorkers;
 		return this.connect(dbName);
+	}
+	
+	public boolean connect(String dbNAme, int numQueueWorkers, int queueLimit) {
+		this.queueLimit = queueLimit;
+		return this.connect(dbNAme, numQueueWorkers);
 	}
 	
 	public boolean close() {
@@ -691,7 +697,19 @@ public abstract class DbConnection {
 		this.dbName = dbName;
 	}
 	
+	private synchronized void waiting(long ms) {
+		try
+		{
+			this.wait(ms);
+		}
+		catch (InterruptedException e)
+		{
+			e.printStackTrace();
+		}
+	}
+	
 	public boolean addExecutionItem(AExecutionItem ei) {
+		while (this.queueLimit  < this.executionQueue.size()) this.waiting(1);
 		return this.executionQueue.add(ei);
 	}
 	
