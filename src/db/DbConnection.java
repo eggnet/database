@@ -8,7 +8,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -18,6 +20,7 @@ import models.CommitDiff;
 import models.CommitFamily;
 import models.DiffEntry;
 import models.DiffEntry.diff_types;
+import models.FileCache;
 import models.FileDiff;
 import db.Resources.ChangeType;
 import db.util.AExecutionItem;
@@ -244,6 +247,7 @@ public abstract class DbConnection {
 			
 			List<CommitDiff> commitDiffs = getDiffTreeFromFirstCommit(fileID, commitID);
 			List<CommitFamily> shortestCommitPath = new ArrayList<CommitFamily>();
+			Map<String, FileCache> fileCaches = getFileCachesFromCommit(fileID, commitID);
 			
 			// Rebuild the commit path that has the latest Add entry in it.
 			for(CommitFamily cf: commitPath)
@@ -252,6 +256,13 @@ public abstract class DbConnection {
 				FileDiff fd = getFileDiffForCommitFamily(cf, commitDiffs, fileID);
 				if(fd != null)
 				{
+					// If the commit has a raw file for this, just get the raw file
+					if(fileCaches.containsKey(cf.getChildId()))
+					{
+						rawFile = fileCaches.get(cf.getChildId()).getRaw_file();
+						break;
+					}
+					else
 					if(fd.isAddCommit())
 					{
 						shortestCommitPath.add(cf);
@@ -426,6 +437,42 @@ public abstract class DbConnection {
 			}
 			
 			return familyList;
+		}
+		catch (SQLException e)
+		{
+			e.printStackTrace();
+			return null;
+		}
+	}
+	
+	/**
+	 * Just return the first 3 file caches found. Just to minimize the number of caches return
+	 * @param fileID
+	 * @param commitID
+	 * @return
+	 */
+	public Map<String, FileCache> getFileCachesFromCommit(String fileID, String commitID)
+	{
+		try{
+			Map<String, FileCache> cacheList = new HashMap<String, FileCache>();
+			String sql = "SELECT file_id, commit_id, raw_file from commits natural join file_caches where " +
+					"file_id=? and " +
+					"(branch_id=? or branch_id is NULL) and commit_date<= " + 
+					"(select commit_date from commits where commit_id=? and " +
+					"(branch_id=? OR branch_id is NULL) limit 1) ORDER BY commit_date DESC limit 3";
+
+			String[] params = {fileID, this.branchID, commitID, this.branchID};
+			ResultSet rs = execPreparedQuery(sql, params);
+			
+			while(rs.next())
+			{
+				String commitId  = rs.getString("commit_id");
+				String fileId 	    = rs.getString("file_id");
+				String rawFile      = rs.getString("raw_file");
+				cacheList.put(commitId, new FileCache(fileId, commitId, rawFile));
+			}
+			
+			return cacheList;	
 		}
 		catch (SQLException e)
 		{
