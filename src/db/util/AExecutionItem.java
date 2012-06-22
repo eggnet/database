@@ -19,4 +19,6 @@ public abstract class AExecutionItem {
 	}
 	
 	public abstract boolean wasExecuted();
+	
+	public abstract boolean combine(AExecutionItem itemToAdd);
 }

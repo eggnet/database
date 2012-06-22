@@ -956,12 +956,18 @@ public abstract class DbConnection {
 		}
 		
 		public void run() {
+			AExecutionItem itemToBeExecuted = null;
 			while (!executionQueue.isEmpty() || !stopWorkers) {
-				AExecutionItem itemToBeExecuted = executionQueue.poll();
+				if (itemToBeExecuted != null) itemToBeExecuted = executionQueue.poll();
 				if (itemToBeExecuted != null) {
+					AExecutionItem nextItem = executionQueue.poll();
+					while (itemToBeExecuted.combine(nextItem)) {
+						nextItem = executionQueue.poll();
+					}
 					itemToBeExecuted.execute(this.conn);
+					itemToBeExecuted = nextItem;
 				}
-				if (executionQueue.isEmpty()) this.waiting(1);
+				if (executionQueue.isEmpty() && itemToBeExecuted == null) this.waiting(1);
 			}
 			try {
 				conn.close();
