@@ -1,5 +1,6 @@
 package db;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
 import java.sql.Connection;
@@ -9,9 +10,12 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import models.Change;
@@ -739,6 +743,53 @@ public abstract class DbConnection {
 		this.addExecutionItem(ei);
 		return new Change(ei);
 	}
+	
+	public List<String> getFilesChangedForParentChildCommit(String oldCommit, String newCommit) {
+		try 
+		{
+			LinkedList<String> files = new LinkedList<String>();
+			String sql = "SELECT file_id FROM file_diffs " +
+					"WHERE old_commit_id=? AND new_commit_id=?"; 
+			String[] parms = {oldCommit, newCommit};
+			ResultSet rs = execPreparedQuery(sql, parms);
+			while(rs.next())
+			{
+				if(!files.contains(rs.getString("file_id")))
+					files.add(rs.getString("file_id"));
+			}
+			return files;
+		}
+		catch(SQLException e) 
+		{
+			e.printStackTrace();
+			return null;
+		}
+	}
+	
+	public Set<String> getChangesetForCommit(String CommitId)
+	{
+		try {
+			Set<String> files = new HashSet<String>();
+			String sql = "Select distinct file_id from file_diffs where new_commit_id=?";
+			ISetter[] parms = {new StringSetter(1, CommitId)};
+			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, parms);
+			this.addExecutionItem(ei);
+			ei.waitUntilExecuted();
+			while (ei.getResult().next())
+			{
+				files.add(ei.getResult().getString("file_id")
+						.substring(ei.getResult().getString("file_id")
+								.lastIndexOf(File.separatorChar)+1));
+			}
+			return files;
+		}
+		catch(SQLException e)
+		{
+			e.printStackTrace();
+			return null;
+		}
+	}
+	
 	
 	public void setConnectionString(String dbName) {
 		this.dbName = dbName;
