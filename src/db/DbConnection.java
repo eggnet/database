@@ -35,9 +35,10 @@ public abstract class DbConnection {
 	
 	private Queue<AExecutionItem> executionQueue = new ConcurrentLinkedQueue<AExecutionItem>();
 	private String dbName;
-	private int queueSize = 2;
+	private int queueSize = 4;
 	private boolean stopWorkers = false;
 	private List<QueueWorker> queueWorkers = new ArrayList<QueueWorker>();
+	private int	queueLimit = 10000;
 	
 	protected DbConnection() 
 	{
@@ -66,9 +67,14 @@ public abstract class DbConnection {
 		return true;
 	}
 	
-	public boolean connect(String dbName, int queueSize) {
-		this.queueSize = queueSize;
+	public boolean connect(String dbName, int numQueueWorkers) {
+		this.queueSize = numQueueWorkers;
 		return this.connect(dbName);
+	}
+	
+	public boolean connect(String dbNAme, int numQueueWorkers, int queueLimit) {
+		this.queueLimit = queueLimit;
+		return this.connect(dbNAme, numQueueWorkers);
 	}
 	
 	public boolean close() {
@@ -426,13 +432,19 @@ public abstract class DbConnection {
 			// Get a random path from this commit to Root
 			// List must be ordered from newest to oldest
 			String currentChild = commitID;
-			// Look for its parent
+			// MAGICAL LOOP OF GOODNESS - DO NOT DELETE ADRIAN!!!!
+			// IT'S POWERS ARE KNOWN FAR AND WIDE
 			for(CommitFamily family : rawFamilyList)
 			{
-				if(family.getChildId().equals(currentChild))
+				// Look for its parent
+				for(CommitFamily secondFamily : rawFamilyList)
 				{
-					familyList.add(new CommitFamily(family.getParentId(), family.getChildId()));
-					currentChild = family.getParentId();
+					if(secondFamily.getChildId().equals(currentChild))
+					{
+						familyList.add(new CommitFamily(secondFamily.getParentId(), secondFamily.getChildId()));
+						currentChild = secondFamily.getParentId();
+						break;
+					}
 				}
 			}
 			
@@ -732,7 +744,19 @@ public abstract class DbConnection {
 		this.dbName = dbName;
 	}
 	
+	private synchronized void waiting(long ms) {
+		try
+		{
+			this.wait(ms);
+		}
+		catch (InterruptedException e)
+		{
+			e.printStackTrace();
+		}
+	}
+	
 	public boolean addExecutionItem(AExecutionItem ei) {
+		while (this.queueLimit  < this.executionQueue.size()) this.waiting(1);
 		return this.executionQueue.add(ei);
 	}
 	
