@@ -73,7 +73,7 @@ public class PreparedStatementExecutionItem extends AExecutionItem {
 	@Override
 	public boolean combine(AExecutionItem itemToAdd) {
 		if (itemToAdd != null && itemToAdd.getClass() == PreparedStatementExecutionItem.class) {
-			if (this.query.toUpperCase().startsWith("INSERT") && !this.query.toUpperCase().contains(";INSERT")) {
+			if (this.query.toUpperCase().startsWith("INSERT") && !this.query.toUpperCase().contains(";SELECT")) {
 				PreparedStatementExecutionItem otherItem = (PreparedStatementExecutionItem) itemToAdd;
 				if (otherItem.query.matches(this.query)) {
 					this.params.addAll(otherItem.params);
