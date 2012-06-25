@@ -1,5 +1,6 @@
 package db;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
 import java.sql.Connection;
@@ -9,9 +10,12 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import models.Change;
@@ -401,9 +405,129 @@ public abstract class DbConnection {
 			System.out.print(e.getMessage());
 			return null;
 		}
-		
 	}
 	
+	/**
+	 * Return all the files exist in current commit.
+	 * @param commitID
+	 * @return a list of all the file id in the given commit
+	 */
+	public List<String> getSourceTree(String commitID)
+	{
+		try
+		{
+			List<String> fileList = new ArrayList<String>();
+			List<CommitFamily> commitPath = getCommitPathToRoot(commitID);
+			List<CommitFamily> shortestCommitPath = new ArrayList<CommitFamily>();
+			Map<String, List<String>> commitCaches = getCommitCachesFromCommit(commitID);
+			
+			// Build the shortest commit path
+			for(CommitFamily cf: commitPath)
+			{
+				// Start from the commit, moving backward until the root or hit a cached commit
+				if(commitCaches.containsKey(cf.getChildId()))
+				{
+					fileList.addAll(commitCaches.get(cf.getChildId()));
+					break;
+				}
+				else
+				{
+					shortestCommitPath.add(cf);
+				}
+			}
+			
+			// Get all the commit file history for every commit in the shortest path
+			if(shortestCommitPath.size() == 0)
+				return fileList;
+			
+			String oldCommit = shortestCommitPath.get(shortestCommitPath.size() - 1).getChildId();
+			Map<String, Map<String, List<String>>> commitHistoryMap = getAddDeleteFileForCommitRange(oldCommit, commitID);
+	
+			// Create list of file from the beginning of shortest path
+			for(int i =shortestCommitPath.size() - 1; i >= 0; i--)
+			{
+				// get all the add or delete files and update file list
+				String currentCommit = shortestCommitPath.get(i).getChildId();
+				if(commitHistoryMap.containsKey(currentCommit))
+				{
+					List<String> addedFiles   = commitHistoryMap.get(currentCommit).get("DIFF_ADD");
+					List<String> deletedFiles = commitHistoryMap.get(currentCommit).get("DIFF_DELETE");
+					if(addedFiles!=null)
+						fileList.addAll(addedFiles);
+					if(deletedFiles!=null)
+						fileList.removeAll(deletedFiles);
+				}
+			}
+			
+			return fileList;
+		}
+		catch (Exception e)
+		{
+			e.printStackTrace();
+			System.out.print(e.getMessage());
+			return null;
+		}
+	}
+	
+	/**
+	 * Get Add and Delete File history for all commits started from the newest commit to the oldes commit
+	 * @param commitID
+	 * @return
+	 */
+	public Map<String, Map<String, List<String>>> getAddDeleteFileForCommitRange(String oldCommitID, String newCommitID) {
+		try 
+		{
+			Map<String, Map<String, List<String>>> commitFileMap = new HashMap<String, Map<String, List<String>>>();
+			String sql = "SELECT file_id, diff_type, commit_id FROM file_diffs natural join commits WHERE " +
+						"(branch_id=? or branch_id is NULL) and " +
+						"commit_date <= (SELECT commit_date from commits where commit_id=? and (branch_id=? OR branch_id is NULL) limit 1) and " +
+						"commit_date >= (SELECT commit_date from commits where commit_id=? and (branch_id=? OR branch_id is NULL) limit 1) and " +
+						 "new_commit_id=commit_id and " +
+						 "(diff_type='DIFF_ADD' or diff_type='DIFF_DELETE');"; 
+			
+			String[] parms = {this.branchID, newCommitID, this.branchID, oldCommitID, this.branchID};
+			ResultSet rs = execPreparedQuery(sql, parms);
+			
+			while(rs.next())
+			{
+				String fileId   = rs.getString("file_id");
+				String diffType = rs.getString("diff_type");
+				String commitId = rs.getString("commit_id");
+				
+				if(commitFileMap.containsKey(commitId))
+				{
+					// already has DIFF_ADD or DIFF_DELETE key
+					if(commitFileMap.get(commitId).containsKey(diffType))
+					{
+						commitFileMap.get(commitId).get(diffType).add(fileId);
+					}
+					else
+					{
+						List<String> files = new ArrayList<String>();
+						files.add(fileId);
+						commitFileMap.get(commitId).put(diffType, files);
+					}
+				}
+				else // doesnt have the commit yet, add new <commit, Map<difftype, List<File>>>
+				{
+					List<String> files = new ArrayList<String>();
+					files.add(fileId);
+					
+					Map<String, List<String>> fileMap = new HashMap<String, List<String>>();
+					fileMap.put(diffType, files);
+					commitFileMap.put(commitId, fileMap);
+				}
+			}
+			
+			return commitFileMap;
+		}
+		catch(SQLException e) 
+		{
+			e.printStackTrace();
+			return null;
+		}
+	}
+
 	/**
 	 * Return a random path from a commit to the Root.
 	 * @param fileID
@@ -482,6 +606,45 @@ public abstract class DbConnection {
 				String fileId 	    = rs.getString("file_id");
 				String rawFile      = rs.getString("raw_file");
 				cacheList.put(commitId, new FileCache(fileId, commitId, rawFile));
+			}
+			
+			return cacheList;	
+		}
+		catch (SQLException e)
+		{
+			e.printStackTrace();
+			return null;
+		}
+	}
+	
+	public Map<String, List<String>> getCommitCachesFromCommit(String commitID)
+	{
+		try{
+			Map<String, List<String>> cacheList = new HashMap<String, List<String>>();
+			
+			String sql = "SELECT file_id, commit_id from commits natural join file_caches where " +
+					"(branch_id=? or branch_id is NULL) and commit_date<= " + 
+					"(select commit_date from commits where commit_id=? and " +
+					"(branch_id=? OR branch_id is NULL) limit 1) ORDER BY commit_date DESC limit 3";
+
+			String[] params = {this.branchID, commitID, this.branchID};
+			ResultSet rs = execPreparedQuery(sql, params);
+			
+			// added to commit cache map
+			while(rs.next())
+			{
+				String commitId     = rs.getString("commit_id");
+				String fileId 	    = rs.getString("file_id");
+				if(cacheList.containsKey(commitId))
+				{
+					cacheList.get(commitId).add(fileId);
+				}
+				else
+				{
+					List<String> fileList = new ArrayList<String>();
+					fileList.add(fileId);
+					cacheList.put(commitId, fileList);
+				}
 			}
 			
 			return cacheList;	
@@ -739,6 +902,53 @@ public abstract class DbConnection {
 		this.addExecutionItem(ei);
 		return new Change(ei);
 	}
+	
+	public List<String> getFilesChangedForParentChildCommit(String oldCommit, String newCommit) {
+		try 
+		{
+			LinkedList<String> files = new LinkedList<String>();
+			String sql = "SELECT file_id FROM file_diffs " +
+					"WHERE old_commit_id=? AND new_commit_id=?"; 
+			String[] parms = {oldCommit, newCommit};
+			ResultSet rs = execPreparedQuery(sql, parms);
+			while(rs.next())
+			{
+				if(!files.contains(rs.getString("file_id")))
+					files.add(rs.getString("file_id"));
+			}
+			return files;
+		}
+		catch(SQLException e) 
+		{
+			e.printStackTrace();
+			return null;
+		}
+	}
+	
+	public Set<String> getChangesetForCommit(String CommitId)
+	{
+		try {
+			Set<String> files = new HashSet<String>();
+			String sql = "Select distinct file_id from file_diffs where new_commit_id=?";
+			ISetter[] parms = {new StringSetter(1, CommitId)};
+			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, parms);
+			this.addExecutionItem(ei);
+			ei.waitUntilExecuted();
+			while (ei.getResult().next())
+			{
+				files.add(ei.getResult().getString("file_id")
+						.substring(ei.getResult().getString("file_id")
+								.lastIndexOf(File.separatorChar)+1));
+			}
+			return files;
+		}
+		catch(SQLException e)
+		{
+			e.printStackTrace();
+			return null;
+		}
+	}
+	
 	
 	public void setConnectionString(String dbName) {
 		this.dbName = dbName;
