@@ -8,6 +8,7 @@ import java.sql.Timestamp;
 public interface ISetter {
 	public PreparedStatement set(PreparedStatement ps) throws SQLException;
 	public CallableStatement set(CallableStatement ps) throws SQLException;
+	public void print();
 	
 	public class StringSetter implements ISetter {
 		private int position;
@@ -28,6 +29,11 @@ public interface ISetter {
 		public CallableStatement set(CallableStatement ps) throws SQLException {
 			ps.setString(position, value);
 			return ps;
+		}
+
+		@Override
+		public void print() {
+			System.err.println(position + " - " + value);
 		}
 	}
 	
@@ -51,6 +57,11 @@ public interface ISetter {
 			ps.setInt(position, value);
 			return ps;
 		}
+
+		@Override
+		public void print() {
+			System.err.println(position + " - " + value);
+		}
 	}
 	
 	public class FloatSetter implements ISetter {
@@ -72,6 +83,11 @@ public interface ISetter {
 		public CallableStatement set(CallableStatement ps) throws SQLException {
 			ps.setFloat(position, value);
 			return ps;
+		}
+
+		@Override
+		public void print() {
+			System.err.println(position + " - " + value);
 		}
 	}
 	
@@ -95,6 +111,11 @@ public interface ISetter {
 			ps.setBoolean(position, value);
 			return ps;
 		}
+
+		@Override
+		public void print() {
+			System.err.println(position + " - " + value);
+		}
 	}
 	
 	public class TimestampSetter implements ISetter {
@@ -116,6 +137,11 @@ public interface ISetter {
 		public CallableStatement set(CallableStatement ps) throws SQLException {
 			ps.setTimestamp(position, value);
 			return ps;
+		}
+
+		@Override
+		public void print() {
+			System.err.println(position + " - " + value);
 		}
 	}
 }

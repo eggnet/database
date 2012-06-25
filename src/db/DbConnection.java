@@ -43,6 +43,7 @@ public abstract class DbConnection {
 	private boolean stopWorkers = false;
 	private List<QueueWorker> queueWorkers = new ArrayList<QueueWorker>();
 	private int	queueLimit = 10000;
+	private int maxBatchSize = 10000;
 	
 	protected DbConnection() 
 	{
@@ -1007,12 +1008,15 @@ public abstract class DbConnection {
 		
 		public void run() {
 			AExecutionItem itemToBeExecuted = null;
+			int currentBatchSize = 0;
 			while (!executionQueue.isEmpty() || !stopWorkers) {
-				if (itemToBeExecuted != null) itemToBeExecuted = executionQueue.poll();
+				currentBatchSize = 0;
+				if (itemToBeExecuted == null) itemToBeExecuted = executionQueue.poll();
 				if (itemToBeExecuted != null) {
 					AExecutionItem nextItem = executionQueue.poll();
-					while (itemToBeExecuted.combine(nextItem)) {
+					while (itemToBeExecuted.combine(nextItem) && currentBatchSize < maxBatchSize) {
 						nextItem = executionQueue.poll();
+						currentBatchSize++;
 					}
 					itemToBeExecuted.execute(this.conn);
 					itemToBeExecuted = nextItem;

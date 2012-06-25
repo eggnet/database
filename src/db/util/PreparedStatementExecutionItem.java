@@ -5,60 +5,50 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
-
-import db.util.ISetter;
 
 public class PreparedStatementExecutionItem extends AExecutionItem {		
 	private String query = null;
-	private List<ISetter[]> params = new ArrayList<ISetter[]>();
+	private ISetter[] params = null;
 	private ResultSet resultSet = null;
 	private boolean wasExecuted = false;
+	private List<PreparedStatementExecutionItem> executionItems = new ArrayList<PreparedStatementExecutionItem>();
 	
 	public PreparedStatementExecutionItem(String query, ISetter[] params) {
 		this.query = query;
-		this.params.add(params);
+		this.params = params;
 	}
 	
 	public void execute(Connection conn) {
 		try {
-			Iterator<ISetter[]> it = this.params.iterator();
 			PreparedStatement s = conn.prepareStatement(query);
-			while (it.hasNext()) {
-				ISetter[] params = it.next();
-				if (params != null) {
-					for (ISetter setter : params) {
-						s = setter.set(s);
-					}
-				}
-				if (it.hasNext()) {
-					s.addBatch();
+			if (params != null) {
+				for (ISetter setter : params) {
+					s = setter.set(s);
 				}
 			}
+			for (PreparedStatementExecutionItem ei : executionItems)
+				s = ei.addToBatch(s);
 			if (query.toLowerCase().startsWith("select")) {
 				resultSet = s.executeQuery();
 			} else {
-				s.execute();
+				if (executionItems.isEmpty())
+					s.execute();
+				else
+					s.executeBatch();
 			}
+			s.close();
 		}
 		catch (SQLException e) {
-			for (ISetter[] params : this.params) {
-				PreparedStatement s = null;
-				try {
-					s = conn.prepareCall(query);
-					if (params != null) {
-						for (ISetter setter : params) {
-							s = setter.set(s);
-						}
-					}
-				} catch (SQLException e1) {
-					e1.printStackTrace();
-				}
-				System.err.println(s.toString());
-			}
+			System.err.println("===> Batch start");
+			this.print();
+			for (PreparedStatementExecutionItem ei : this.executionItems)
+				ei.print();
+			System.err.println("===> Batch end");
 			e.printStackTrace();
 		}
+		for (PreparedStatementExecutionItem ei : executionItems)
+			ei.wasExecuted = true;
 		wasExecuted = true;
 	}
 	
@@ -75,12 +65,28 @@ public class PreparedStatementExecutionItem extends AExecutionItem {
 		if (itemToAdd != null && itemToAdd.getClass() == PreparedStatementExecutionItem.class) {
 			if (this.query.toUpperCase().startsWith("INSERT") && !this.query.toUpperCase().contains(";SELECT")) {
 				PreparedStatementExecutionItem otherItem = (PreparedStatementExecutionItem) itemToAdd;
-				if (otherItem.query.matches(this.query)) {
-					this.params.addAll(otherItem.params);
+				if (otherItem.query.toUpperCase().startsWith("INSERT") && !otherItem.query.toUpperCase().contains(";SELECT") && otherItem.query.toLowerCase().equals(query.toLowerCase())) {
+					this.executionItems.add(otherItem);
 					return true;
 				}
 			}
 		}
 		return false;
+	}
+
+	@Override
+	public void print() {
+		System.err.println(this.query);
+		for (ISetter s : this.params) s.print();
+	}
+	
+	private PreparedStatement addToBatch(PreparedStatement statement) throws SQLException {
+		statement.addBatch();
+		if (params != null) {
+			for (ISetter s : params) {
+				s.set(statement);
+			}
+		}
+		return statement;
 	}
 }

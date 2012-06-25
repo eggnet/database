@@ -4,50 +4,46 @@ import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
-
-import db.util.ISetter;
 
 public class PreparedCallExecutionItem extends AExecutionItem {
 	private String query;
-	private List<ISetter[]> params = new ArrayList<ISetter[]>();
+	private ISetter[] params = null;
 	private boolean wasExecuted = false;
+	private List<PreparedCallExecutionItem> executionItems = new ArrayList<PreparedCallExecutionItem>();
 
 	public PreparedCallExecutionItem(String query, ISetter[] params) {
 		this.query = query;
-		this.params.add(params);
+		this.params = params;
 	}
 	
 	@Override
 	public void execute(Connection conn) {
 		try {
 			CallableStatement s = conn.prepareCall(query);
-			Iterator<ISetter[]> it = this.params.iterator();
-			while (it.hasNext()) {
-				ISetter[] params = it.next();
-				for (ISetter setter : params) s = setter.set(s);
-				if (it.hasNext()) s.addBatch();
+			if (params != null) {
+				for (ISetter setter : params) {
+					s = setter.set(s);
+				}
 			}
-			s.execute();
+			for (PreparedCallExecutionItem ei : executionItems)
+				s = ei.addToBatch(s);
+			if (executionItems.isEmpty())
+				s.execute();
+			else
+				s.executeBatch();
+			s.close();
 		}
 		catch (SQLException e) {
-			CallableStatement s = null;
-			try {
-				for (ISetter[] params : this.params) {
-					s = conn.prepareCall(query);
-					if (params != null) {
-						for (ISetter setter : params) {
-							s = setter.set(s);
-						}
-					}
-				}
-			} catch (SQLException e1) {
-				e1.printStackTrace();
-			}
-			System.err.println(s.toString());				
+			System.err.println("===> Batch start");
+			this.print();
+			for (PreparedCallExecutionItem ei : this.executionItems)
+				ei.print();
+			System.err.println("===> Batch end");
 			e.printStackTrace();
 		}
+		for (PreparedCallExecutionItem ei : executionItems)
+			ei.wasExecuted = true;
 		wasExecuted = true;
 	}
 
@@ -60,11 +56,27 @@ public class PreparedCallExecutionItem extends AExecutionItem {
 	public boolean combine(AExecutionItem itemToAdd) {
 		if (itemToAdd != null && itemToAdd.getClass() == PreparedCallExecutionItem.class) {
 			PreparedCallExecutionItem otherItem = (PreparedCallExecutionItem) itemToAdd;
-			if (otherItem.query.matches(this.query)) {
-				this.params.addAll(otherItem.params);
+			if (otherItem.query.toLowerCase().equals(query.toLowerCase())) {
+				executionItems.add((PreparedCallExecutionItem) itemToAdd);
 				return true;
 			}
 		}		
 		return false;
+	}	
+	
+	@Override
+	public void print() {
+		System.err.println(this.query);
+		for (ISetter s : this.params) s.print();
+	}
+	
+	private CallableStatement addToBatch(CallableStatement statement) throws SQLException {
+		statement.addBatch();
+		if (params != null) {
+			for (ISetter s : params) {
+				s.set(statement);
+			}
+		}
+		return statement;
 	}
 }
