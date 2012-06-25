@@ -36,8 +36,8 @@ public class PreparedStatementExecutionItem extends AExecutionItem {
 					s.execute();
 				else
 					s.executeBatch();
+				s.close();
 			}
-			s.close();
 		}
 		catch (SQLException e) {
 			System.err.println("===> Batch start");
