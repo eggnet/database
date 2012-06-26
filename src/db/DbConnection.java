@@ -937,9 +937,7 @@ public abstract class DbConnection {
 			ei.waitUntilExecuted();
 			while (ei.getResult().next())
 			{
-				files.add(ei.getResult().getString("file_id")
-						.substring(ei.getResult().getString("file_id")
-								.lastIndexOf(File.separatorChar)+1));
+				files.add(ei.getResult().getString("file_id"));
 			}
 			return files;
 		}
