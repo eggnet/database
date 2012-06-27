@@ -9,9 +9,18 @@ public abstract class Resources {
 	public static final String EGGNET_DB_NAME = "eggnet";
 	public static final SimpleDateFormat DBDateFormat = new SimpleDateFormat("yyyy-mm-dd kk:mm:ss Z");
 	public static final int DB_LIMIT = 2000;
-	
+	public static final SimpleDateFormat JiraDateFormat = new SimpleDateFormat("yyyy-mm-dd kk:mm:ss.SSSZ");  
+
 	public enum ChangeType {
 		MODIFYINSERT, MODIFYDELETE, DELETE, ADD, MODIFY, MOVE, RENAME
+	}
+	
+	public enum CommType {
+		EMAIL, BUGZILLA, JIRA, ISSUE, GITHUB, FORUM
+	}
+	
+	public enum TextType {
+		PATCH, SOURCE, TRACE, NAME, KEYWORD, COMMITID
 	}
 	
 	public static int convertLineEndToCharEnd(int lineEnd, String file) {
