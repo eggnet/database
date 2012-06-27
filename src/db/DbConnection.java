@@ -541,40 +541,38 @@ public abstract class DbConnection {
 			String sql = "SELECT parent, child from commit_family natural join commits where " +
 					"(branch_id=? or branch_id is NULL) and " +
 					"commit_date <= " +
-					"(SELECT commit_date from commits where commit_id=? and (branch_id=? OR branch_id is NULL) limit 1) AND commit_id=child";
+					"(SELECT commit_date from commits where commit_id=? and (branch_id=? OR branch_id is NULL) limit 1) AND commit_id=child ORDER BY commit_date desc;";
 
-			Map<String, List<String>> familyMap = new HashMap<String, List<String>>();
+			List<CommitFamily> rawFamilyList = new ArrayList<CommitFamily>();
 			List<CommitFamily> familyList 	 = new ArrayList<CommitFamily>();
-			
 			String[] parms = {this.branchID,commitID, this.branchID};
 			ResultSet rs = execPreparedQuery(sql, parms);
-			
-			// Create family map for all commits
 			while(rs.next())
 			{
 				String parentId = rs.getString("parent");
 				String childId  = rs.getString("child");
-				if(familyMap.containsKey(childId))
-				{
-					familyMap.get(childId).add(parentId);
-				}
-				else
-				{
-					List<String> parentList = new ArrayList<String>();
-					parentList.add(parentId);
-					familyMap.put(childId, parentList);
-				}
+				rawFamilyList.add(new CommitFamily(parentId, childId));
 			}
-			
+
 			// Get a random path from this commit to Root
+			// List must be ordered from newest to oldest
 			String currentChild = commitID;
-			while(familyMap.containsKey(currentChild))
+			// MAGICAL LOOP OF GOODNESS - DO NOT DELETE ADRIAN!!!!
+			// IT'S POWERS ARE KNOWN FAR AND WIDE
+			for(CommitFamily family : rawFamilyList)
 			{
-				String parentId = familyMap.get(currentChild).get(0);
-				familyList.add(new CommitFamily(parentId, currentChild));
-				currentChild = parentId;
+				// Look for its parent
+				for(CommitFamily secondFamily : rawFamilyList)
+				{
+					if(secondFamily.getChildId().equals(currentChild))
+					{
+						familyList.add(new CommitFamily(secondFamily.getParentId(), secondFamily.getChildId()));
+						currentChild = secondFamily.getParentId();
+						break;
+					}
+				}
 			}
-			
+
 			return familyList;
 		}
 		catch (SQLException e)
@@ -583,6 +581,7 @@ public abstract class DbConnection {
 			return null;
 		}
 	}
+
 	
 	/**
 	 * Just return the first 3 file caches found. Just to minimize the number of caches return
