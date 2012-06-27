@@ -400,4 +400,16 @@ public class SocialDb extends DbConnection
 		addExecutionItem(ei);
 		ei.waitUntilExecuted();
 	}
+	
+	public Set<Item> getAllLinkedItemsForCommit(String CommitId)
+	{
+		String sql = "SELECT * from items natural join links where commit_id=?;";
+		ISetter[] parms = { new StringSetter(1, CommitId) };
+		PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, parms);
+		
+		// TODO @braden
+		
+		return null;
+	}
+	
 }
