@@ -29,6 +29,7 @@ import models.FileDiff;
 import db.Resources.ChangeType;
 import db.util.AExecutionItem;
 import db.util.ISetter;
+import db.util.ISetter.IntSetter;
 import db.util.ISetter.StringSetter;
 import db.util.ISetter.TimestampSetter;
 import db.util.PreparedStatementExecutionItem;
@@ -927,6 +928,53 @@ public abstract class DbConnection {
 		}
 	}
 	
+	public List<Commit> getCommits(int iLIMIT, int iOFFSET) {
+		LinkedList<Commit> commits = new LinkedList<Commit>();
+		String sql = "SELECT * FROM commits " +
+				"ORDER BY commit_date DESC " +
+				"LIMIT ? OFFSET ?"; 
+		ISetter[] params = {new IntSetter(1,iLIMIT), new IntSetter(2, iOFFSET)};
+		PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, params);
+		addExecutionItem(ei);
+		
+		for (int i = 0;i < 100;i++)
+		{
+			commits.add(new Commit(ei));
+		}
+		return commits;
+	}
+	
+	public List<Commit> getCommitsAroundDate(Timestamp date) {
+		try {
+			List<Commit> commits = new ArrayList<Commit>();
+			
+			String sql = "SELECT commit_id, author, author_email, comments, commit_date, branch_id FROM commits WHERE" +
+					" (branch_id is NULL OR branch_id=?) AND" +
+					" commit_date >= ?::timestamp and commit_date <= ?::timestamp"; 
+			Timestamp dateAfter = new Timestamp(date.getTime());
+			dateAfter.setTime(date.getTime() + 3600 * 1000 * 24 * 7);
+			date.setTime(date.getTime() - 3600 * 1000 * 24 * 7);
+			String[] parms = {branchID, date.toString(), dateAfter.toString()};
+			ResultSet rs = execPreparedQuery(sql, parms);
+			while(rs.next())
+			{
+				commits.add(new Commit(
+						rs.getString("commit_id"),
+						rs.getString("author"),
+						rs.getString("author_email"),
+						rs.getString("comments"),
+						rs.getTimestamp("commit_date"),
+						rs.getString("branch_id")
+				));
+			}
+			return commits;
+		}
+		catch(SQLException e) {
+			e.printStackTrace();
+			return null;
+		}
+	}
+	
 	public Set<String> getChangesetForCommit(String CommitId)
 	{
 		try {
@@ -938,9 +986,7 @@ public abstract class DbConnection {
 			ei.waitUntilExecuted();
 			while (ei.getResult().next())
 			{
-				files.add(ei.getResult().getString("file_id")
-						.substring(ei.getResult().getString("file_id")
-								.lastIndexOf(File.separatorChar)+1));
+				files.add(ei.getResult().getString("file_id"));
 			}
 			return files;
 		}
