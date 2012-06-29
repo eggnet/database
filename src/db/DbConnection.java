@@ -1,6 +1,5 @@
 package db;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
 import java.sql.Connection;
@@ -1061,12 +1060,15 @@ public abstract class DbConnection {
 				if (itemToBeExecuted == null) itemToBeExecuted = executionQueue.poll();
 				if (itemToBeExecuted != null) {
 					AExecutionItem nextItem = executionQueue.poll();
-					while (itemToBeExecuted.combine(nextItem) && currentBatchSize < maxBatchSize) {
+					boolean combined = itemToBeExecuted.combine(nextItem);
+					while (combined && currentBatchSize < maxBatchSize) {
 						nextItem = executionQueue.poll();
 						currentBatchSize++;
+						combined = itemToBeExecuted.combine(nextItem);
 					}
 					itemToBeExecuted.execute(this.conn);
 					itemToBeExecuted = nextItem;
+					if (combined) itemToBeExecuted = null;
 				}
 				if (executionQueue.isEmpty() && itemToBeExecuted == null) this.waiting(1);
 			}
