@@ -1054,23 +1054,24 @@ public abstract class DbConnection {
 		
 		public void run() {
 			AExecutionItem itemToBeExecuted = null;
-			int currentBatchSize = 0;
+			//int currentBatchSize = 0;
 			while (!executionQueue.isEmpty() || !stopWorkers) {
-				currentBatchSize = 0;
-				if (itemToBeExecuted == null) itemToBeExecuted = executionQueue.poll();
+				//currentBatchSize = 0;
+				/*if (itemToBeExecuted == null)*/ itemToBeExecuted = executionQueue.poll();
 				if (itemToBeExecuted != null) {
-					AExecutionItem nextItem = executionQueue.poll();
-					boolean combined = itemToBeExecuted.combine(nextItem);
-					while (combined && currentBatchSize < maxBatchSize) {
-						nextItem = executionQueue.poll();
-						currentBatchSize++;
-						combined = itemToBeExecuted.combine(nextItem);
-					}
+					//AExecutionItem nextItem = executionQueue.poll();
+					//boolean combined = itemToBeExecuted.combine(nextItem);
+					//while (combined && currentBatchSize < maxBatchSize) {
+					//	nextItem = executionQueue.poll();
+					//	currentBatchSize++;
+					//	combined = itemToBeExecuted.combine(nextItem);
+					//}
 					itemToBeExecuted.execute(this.conn);
-					itemToBeExecuted = nextItem;
-					if (combined) itemToBeExecuted = null;
+					//itemToBeExecuted = nextItem;
+					//if (combined) itemToBeExecuted = null;
 				}
-				if (executionQueue.isEmpty() && itemToBeExecuted == null) this.waiting(1);
+				//if (executionQueue.isEmpty() && itemToBeExecuted == null) this.waiting(1);
+				if (executionQueue.isEmpty()) this.waiting(1);
 			}
 			try {
 				conn.close();
