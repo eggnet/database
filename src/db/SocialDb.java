@@ -17,13 +17,12 @@ import models.Item;
 import models.Link;
 import models.Person;
 import models.Silent;
-
 import db.Resources.CommType;
 import db.util.ISetter;
-import db.util.PreparedStatementExecutionItem;
 import db.util.ISetter.FloatSetter;
 import db.util.ISetter.IntSetter;
 import db.util.ISetter.StringSetter;
+import db.util.PreparedStatementExecutionItem;
 
 public class SocialDb extends DbConnection
 {
@@ -115,7 +114,8 @@ public class SocialDb extends DbConnection
 	public List<Integer> insertPeople(List<Person> people) {
 		List<Integer> inserts = new ArrayList<Integer>();
 		for(Person person: people) {
-			inserts.add(insertPerson(person));
+			if (person.getEmail() != null && person.getName() != null)
+				inserts.add(insertPerson(person));
 		}
 		return inserts;
 	}
@@ -124,6 +124,7 @@ public class SocialDb extends DbConnection
 		String query = "INSERT INTO threads (item_id, thread_id) VALUES " +
 				"(" + thread.getItemID() + ", " + thread.getThreadID() + ")";
 		PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(query, null);
+		addExecutionItem(ei);
 		ei.waitUntilExecuted();
 		return true;
 	}
@@ -400,16 +401,4 @@ public class SocialDb extends DbConnection
 		addExecutionItem(ei);
 		ei.waitUntilExecuted();
 	}
-	
-	public Set<Item> getAllLinkedItemsForCommit(String CommitId)
-	{
-		String sql = "SELECT * from items natural join links where commit_id=?;";
-		ISetter[] parms = { new StringSetter(1, CommitId) };
-		PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, parms);
-		
-		// TODO @braden
-		
-		return null;
-	}
-	
 }
