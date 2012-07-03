@@ -55,7 +55,7 @@ public class SocialDb extends DbConnection
 			connect(dbName.toLowerCase());
 			
 			// Now load our default schema in.
-			runScript(new InputStreamReader(this.getClass().getResourceAsStream("createdb.sql")));
+			runScript(new InputStreamReader(this.getClass().getResourceAsStream("createSocialDb.sql")));
 			return true;
 		}
 		catch (Exception e)
