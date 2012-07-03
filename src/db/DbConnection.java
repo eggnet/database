@@ -110,8 +110,6 @@ public abstract class DbConnection {
 	public String getBranchName() {
 		return branchName;
 	}
-
-	public void execBatch() {}
 	
 	/**
 	 * blocking
