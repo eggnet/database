@@ -1,6 +1,5 @@
 package db;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
 import java.sql.Connection;
@@ -111,8 +110,6 @@ public abstract class DbConnection {
 	public String getBranchName() {
 		return branchName;
 	}
-
-	public void execBatch() {}
 	
 	/**
 	 * blocking
@@ -1079,20 +1076,24 @@ public abstract class DbConnection {
 		
 		public void run() {
 			AExecutionItem itemToBeExecuted = null;
-			int currentBatchSize = 0;
+			//int currentBatchSize = 0;
 			while (!executionQueue.isEmpty() || !stopWorkers) {
-				currentBatchSize = 0;
-				if (itemToBeExecuted == null) itemToBeExecuted = executionQueue.poll();
+				//currentBatchSize = 0;
+				/*if (itemToBeExecuted == null)*/ itemToBeExecuted = executionQueue.poll();
 				if (itemToBeExecuted != null) {
-					AExecutionItem nextItem = executionQueue.poll();
-					while (itemToBeExecuted.combine(nextItem) && currentBatchSize < maxBatchSize) {
-						nextItem = executionQueue.poll();
-						currentBatchSize++;
-					}
+					//AExecutionItem nextItem = executionQueue.poll();
+					//boolean combined = itemToBeExecuted.combine(nextItem);
+					//while (combined && currentBatchSize < maxBatchSize) {
+					//	nextItem = executionQueue.poll();
+					//	currentBatchSize++;
+					//	combined = itemToBeExecuted.combine(nextItem);
+					//}
 					itemToBeExecuted.execute(this.conn);
-					itemToBeExecuted = nextItem;
+					//itemToBeExecuted = nextItem;
+					//if (combined) itemToBeExecuted = null;
 				}
-				if (executionQueue.isEmpty() && itemToBeExecuted == null) this.waiting(1);
+				//if (executionQueue.isEmpty() && itemToBeExecuted == null) this.waiting(1);
+				if (executionQueue.isEmpty()) this.waiting(1);
 			}
 			try {
 				conn.close();
