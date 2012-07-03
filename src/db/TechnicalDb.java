@@ -1360,4 +1360,28 @@ public class TechnicalDb extends DbConnection
 
 		return null;
 	}
+	
+	/**
+	 * 
+	 * @param CommitId
+	 * @return {@code true} if commit passed, {@code false} if failed.
+	 */
+	public boolean getCommitStatus(String CommitId)
+	{
+		try
+		{
+			String sql = "SELECT * from fix_inducing where bug=?";
+			ISetter[] parms = {new StringSetter(1, CommitId)};
+			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, parms);
+			this.addExecutionItem(ei);
+			ei.waitUntilExecuted();
+			if(ei.getResult().next())
+				return true;
+		}
+		catch (SQLException e)
+		{
+			e.printStackTrace();
+		}
+		return false;
+	}
 }
