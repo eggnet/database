@@ -6,31 +6,14 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.Queue;
-import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-import models.Change;
-import models.Commit;
-import models.CommitDiff;
-import models.CommitFamily;
-import models.DiffEntry;
-import models.DiffEntry.diff_types;
-import models.FileCache;
-import models.FileDiff;
-import db.Resources.ChangeType;
 import db.util.AExecutionItem;
 import db.util.ISetter;
-import db.util.ISetter.IntSetter;
 import db.util.ISetter.StringSetter;
-import db.util.ISetter.TimestampSetter;
 import db.util.PreparedStatementExecutionItem;
 
 public abstract class DbConnection {
