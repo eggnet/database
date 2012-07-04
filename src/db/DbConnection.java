@@ -79,31 +79,6 @@ public abstract class DbConnection {
 		conn.close();
 	}
 	
-	/**
-	 * blocking
-	 * 
-	 * Executes the given query with escaped values in String[] params in place of
-	 * ? characters in sql.
-	 * @param sql ex. "SELECT * FROM something where my_column=?"
-	 * @param params ex. {"braden's work"}
-	 * @return Query ResultSet on success, null otherwise
-	 */
-	@Deprecated
-	public ResultSet execPreparedQuery(String sql, String[] params)
-	{
-		ISetter[] ps = null;
-		if (params != null && params.length > 0) {
-			ps = new ISetter[params.length];
-			for (int i = 0; i < params.length; ++i) {
-				ps[i] = new StringSetter(i+1,params[i]);
-			}
-		}
-		PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, ps);
-		this.addExecutionItem(ei);
-		ei.waitUntilExecuted();
-		return ei.getResult();
-	}
-
 	public void setConnectionString(String dbName) {
 		this.dbName = dbName;
 	}
