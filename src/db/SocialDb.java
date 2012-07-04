@@ -1,7 +1,6 @@
 package db;
 
 import java.io.InputStreamReader;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -36,7 +35,6 @@ public class SocialDb extends DbConnection
 	 * @return true for success
 	 */
 	public boolean createDb(String dbName) {
-		PreparedStatement s;
 		try {
 			// Drop the DB if it already exists
 			String query = "DROP DATABASE IF EXISTS " + dbName + ";";
@@ -64,6 +62,11 @@ public class SocialDb extends DbConnection
 		}
 	}
 	
+	/**
+	 * Insert a Social Item 
+	 * @param item
+	 * @return the sequence id of the inserted item
+	 */
 	public int insertItem(Item item) {
 		String query = "INSERT INTO items (p_id, item_date, item_id, body, title, type) VALUES " +
 				"(" + item.getPId() + ", ?::timestamp, default, ?, ?, ?)";
@@ -79,13 +82,25 @@ public class SocialDb extends DbConnection
 		return getSequenceValue("items_id_seq"); 
 	}
 	
+	/**
+	 * Insert a person to people table and return the newly created sequence id
+	 * If the person already exists, return the sequence id
+	 * @param person
+	 * @return sequence id as p_id. -1 if there is exception
+	 */
 	public int insertPerson(Person person) {
 		try 
 		{
 			String sql = "SELECT * FROM people WHERE " +
 					"name=? AND email=?"; 
-			String[] parms = {person.getName(), person.getEmail()};
-			ResultSet rs = execPreparedQuery(sql, parms);
+			
+			ISetter[] prms = {new StringSetter(1,person.getName()),
+							  new StringSetter(2,person.getEmail())};
+			PreparedStatementExecutionItem eifirst = new PreparedStatementExecutionItem(sql, prms);
+			addExecutionItem(eifirst);
+			eifirst.waitUntilExecuted();
+			ResultSet rs = eifirst.getResult();
+
 			if(!rs.next()) {
 				// Insert
 				String query = "INSERT INTO people (p_id, name, email) VALUES " +
@@ -111,15 +126,11 @@ public class SocialDb extends DbConnection
 		}
 	}
 	
-	public List<Integer> insertPeople(List<Person> people) {
-		List<Integer> inserts = new ArrayList<Integer>();
-		for(Person person: people) {
-			if (person.getEmail() != null && person.getName() != null)
-				inserts.add(insertPerson(person));
-		}
-		return inserts;
-	}
-	
+	/**
+	 * Insert a thread into Threads table
+	 * @param thread
+	 * @return true if succeed. Exception throw if not
+	 */
 	public boolean insertThread(models.Thread thread) {
 		String query = "INSERT INTO threads (item_id, thread_id) VALUES " +
 				"(" + thread.getItemID() + ", " + thread.getThreadID() + ")";
@@ -129,6 +140,12 @@ public class SocialDb extends DbConnection
 		return true;
 	}
 	
+	/**
+	 * Insert Link into Links table
+	 * If Link already exists, update its confidence
+	 * @param link
+	 * @return true if succeed, false ow
+	 */
 	public boolean insertLink(Link link) {
 		try {
 			// First check if a link exists. 
@@ -167,6 +184,11 @@ public class SocialDb extends DbConnection
 		}
 	}
 	
+	/**
+	 * Insert Issue into issues table
+	 * @param issue
+	 * @return true if succeeds, throw exception ow
+	 */
 	public boolean insertIssue(Issue issue) {
 		String query = "INSERT INTO issues (item_id, status, assignee_id, creation_ts, last_modified_ts, " +
 				"title, description, creator_id, keywords, issue_num) VALUES " +
@@ -187,6 +209,11 @@ public class SocialDb extends DbConnection
 		return true;
 	}
 	
+	/**
+	 * Insert Silent to silents table
+	 * @param silent
+	 * @return true if succeed, exception ow
+	 */
 	public boolean insertSilent(Silent silent) {
 		String query = "INSERT INTO silents (p_id, item_id) VALUES " +
 					"(" + silent.getpID() + ", " + silent.getItemID() + ")";
@@ -196,6 +223,11 @@ public class SocialDb extends DbConnection
 		return true;
 	}
 	
+	/**
+	 * Insert Attachment to attachments table
+	 * @param attachment
+	 * @return true if succeed, exception ow
+	 */
 	public boolean insertAttachment(Attachment attachment) {
 		String query = "INSERT INTO attachments (item_id, title, body) VALUES " +
 					"(" + attachment.getItemID() + ", ?, ?)";
@@ -209,6 +241,11 @@ public class SocialDb extends DbConnection
 		return true;
 	}
 	
+	/** 
+	 * Insert dependency into Dependencies table
+	 * @param dependency
+	 * @return true if succeed, exception ow
+	 */
 	public boolean insertDependency(Dependency dependency) {
 		String query = "INSERT INTO dependencies (item_id, depends_on_id) VALUES (?, ?)";
 		ISetter[] params = {
@@ -221,6 +258,11 @@ public class SocialDb extends DbConnection
 		return true;
 	}
 	
+	/**
+	 * Get a list of items related to this thread
+	 * @param ThreadID
+	 * @return List of items, empty if none found, null ow
+	 */
 	public List<Item> getItemsInThread(int ThreadID) {
 		try 
 		{
@@ -228,8 +270,13 @@ public class SocialDb extends DbConnection
 			String sql = "SELECT p_id, item_date, items.item_id, body, title, type" +
 					" FROM threads JOIN items ON (threads.item_id = items.item_id)" +
 					" WHERE thread_id=" + ThreadID; 
-			String[] parms = {};
-			ResultSet rs = execPreparedQuery(sql, parms);
+			
+			ISetter[] params = {};
+			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, params);
+			addExecutionItem(ei);
+			ei.waitUntilExecuted();
+			
+			ResultSet rs = ei.getResult();
 			while(rs.next())
 			{
 				items.add(new Item(rs.getInt("p_id"), rs.getTimestamp("item_date"), rs.getInt("item_id"), 
@@ -244,13 +291,21 @@ public class SocialDb extends DbConnection
 		}
 	}
 	
+	/**
+	 * Get Sequence Id for a sequence table
+	 * @param sequence
+	 * @return sequence id, -1 of none found or there is exception
+	 */
 	private int getSequenceValue(String sequence) {
 		try 
 		{
 			// Get the ID
 			String sql = "SELECT currval(?)"; 
-			String[] parms = {sequence};
-			ResultSet rs = execPreparedQuery(sql, parms);
+			ISetter[] params = {new StringSetter(1, sequence)};
+			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, params);
+			addExecutionItem(ei);
+			ei.waitUntilExecuted();
+			ResultSet rs = ei.getResult();
 			if(rs.next())
 				return rs.getInt("currval");
 			return -1;
@@ -262,14 +317,23 @@ public class SocialDb extends DbConnection
 		}
 	}
 
+	/**
+	 * Get item id (Sequence id) for an issue Key
+	 * @param dependsKey - issue_num in issues table
+	 * @return item id. -1 if not found or exception
+	 */
 	public int findItemIDFromJiraKey(String dependsKey)
 	{
 		try 
 		{
 			// Get the ID
 			String sql = "SELECT item_id from issues where issue_num = ?";
-			String[] parms = {dependsKey};
-			ResultSet rs = execPreparedQuery(sql, parms);
+			
+			ISetter[] params = {new StringSetter(1, dependsKey)};
+			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, params);
+			addExecutionItem(ei);
+			ei.waitUntilExecuted();
+			ResultSet rs = ei.getResult();
 			if(rs.next())
 				return rs.getInt("item_id");
 			return -1;
@@ -280,14 +344,24 @@ public class SocialDb extends DbConnection
 			return -1;
 		}		
 	}
-	
+
+	/**
+	 * Get a list of item id which has the same issue number (bugNumber)
+	 * @param bugNumber - issue_num
+	 * @return List of item id. Null if there is exception
+	 */
 	public Set<Integer> getIssuesMatchingBugNumber(String bugNumber)
 	{
 		Set<Integer> issues = new HashSet<Integer>();
 		try {
 			String sql = "SELECT item_id FROM issues WHERE issue_num=?";
-			String[] parms = {bugNumber};
-			ResultSet rs = execPreparedQuery(sql, parms);
+			
+			ISetter[] params = {new StringSetter(1, bugNumber)};
+			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, params);
+			addExecutionItem(ei);
+			ei.waitUntilExecuted();
+			ResultSet rs = ei.getResult();
+			
 			while (rs.next())
 			{
 				issues.add(rs.getInt(1));
@@ -296,15 +370,26 @@ public class SocialDb extends DbConnection
 		}
 		catch(SQLException e)
 		{
+			e.printStackTrace();
 			return null;
 		}
 	}
 	
+	/**
+	 * Get the first Item id found that has this bug number
+	 * @param bugNum - issue_num
+	 * @return first item id found, -1 if not found or exception
+	 */
 	public int getItemIDFromBugNumber(int bugNum) {
 		try {
 			String sql = "SELECT item_id FROM issues WHERE issue_num=?";
-			String[] parms = {Integer.toString(bugNum)};
-			ResultSet rs = execPreparedQuery(sql, parms);
+			
+			ISetter[] params = {new StringSetter(1, Integer.toString(bugNum))};
+			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, params);
+			addExecutionItem(ei);
+			ei.waitUntilExecuted();
+			ResultSet rs = ei.getResult();
+			
 			while (rs.next())
 				return rs.getInt("item_id");
 			
@@ -312,10 +397,17 @@ public class SocialDb extends DbConnection
 		}
 		catch(SQLException e)
 		{
+			e.printStackTrace();
 			return -1;
 		}
 	}
 	
+	/**
+	 * Get a list of Issue within a limit number and offset (index to start)
+	 * @param iLIMIT
+	 * @param iOFFSET
+	 * @return List of issues, Null if there is exception
+	 */
 	public List<Issue> getIssues(int iLIMIT, int iOFFSET) {
 		try 
 		{
@@ -323,8 +415,11 @@ public class SocialDb extends DbConnection
 			String sql = "SELECT * FROM issues " +
 					"ORDER BY item_id " +
 					"LIMIT " + iLIMIT + " OFFSET " + iOFFSET; 
-			String[] parms = {};
-			ResultSet rs = execPreparedQuery(sql, parms);
+			ISetter[] params = {};
+			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, params);
+			addExecutionItem(ei);
+			ei.waitUntilExecuted();
+			ResultSet rs = ei.getResult();
 			while(rs.next())
 			{
 				issues.add(new Issue(rs.getInt("item_id"), rs.getString("status"), rs.getInt("assignee_id"), 
@@ -343,7 +438,7 @@ public class SocialDb extends DbConnection
 	
 	/**
 	 * Gets a list of all Non-Issue items
-	 * @return
+	 * @return List of items, Null if there is exception
 	 */
 	public List<Item> getAllItems()
 	{
@@ -351,8 +446,11 @@ public class SocialDb extends DbConnection
 		try
 		{
 			String sql = "SELECT p_id, item_date, item_id, body, title, type from items natural full join links where type != 'ISSUE';";
-			String[] parms = {};
-			ResultSet rs = execPreparedQuery(sql, parms);
+			ISetter[] params = {};
+			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, params);
+			addExecutionItem(ei);
+			ei.waitUntilExecuted();
+			ResultSet rs = ei.getResult();
 			while(rs.next())
 			{
 				Item i = new Item(
@@ -374,14 +472,23 @@ public class SocialDb extends DbConnection
 		}
 	}
 	
+	/**
+	 * Get a list of commit id that are associated with this issue
+	 * @param issue
+	 * @return
+	 */
 	public List<String> getCommitIDForIssue(Issue issue) {
 		try 
 		{
 			LinkedList<String> commitIDs = new LinkedList<String>();
 			String sql = "SELECT * FROM links " +
 					"WHERE item_id=" + issue.getItemID();
-			String[] parms = {};
-			ResultSet rs = execPreparedQuery(sql, parms);
+			
+			ISetter[] params = {};
+			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, params);
+			addExecutionItem(ei);
+			ei.waitUntilExecuted();
+			ResultSet rs = ei.getResult();
 			while(rs.next())
 			{
 				commitIDs.add(rs.getString("commit_id"));
@@ -395,6 +502,9 @@ public class SocialDb extends DbConnection
 		}
 	}
 	
+	/**
+	 * Delete All Links in links table
+	 */
 	public void deleteLinks() {
 		String sql = "DELETE FROM links;";
 		PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, null);
