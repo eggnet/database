@@ -538,44 +538,41 @@ public class TechnicalDb extends DbConnection
 			String sql = "SELECT parent, child from commit_family natural join commits where " +
 					"(branch_id=? or branch_id is NULL) and " +
 					"commit_date <= " +
-					"(SELECT commit_date from commits where commit_id=? and (branch_id=? OR branch_id is NULL) limit 1) AND commit_id=child ORDER BY commit_date desc;";
+					"(SELECT commit_date from commits where commit_id=? and (branch_id=? OR branch_id is NULL) limit 1) AND commit_id=child;";
 
-			List<CommitFamily> rawFamilyList = new ArrayList<CommitFamily>();
-			List<CommitFamily> familyList 	 = new ArrayList<CommitFamily>();
-			
-			ISetter[] params = {new StringSetter(1,this.branchID),
-								new StringSetter(2,commitID),
-								new StringSetter(3,this.branchID)};
-			
-			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, params);
+			Map<String, List<String>> familyMap = new HashMap<String, List<String>>();
+			List<CommitFamily> familyList 	    = new ArrayList<CommitFamily>();
+
+			ISetter[] parms = {new StringSetter(1, this.branchID), new StringSetter(2, commitID), new StringSetter(3, this.branchID)};
+			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, parms);
 			addExecutionItem(ei);
 			ei.waitUntilExecuted();
-			
 			ResultSet rs = ei.getResult();
+			
+			// Create family map for all commits
 			while(rs.next())
 			{
 				String parentId = rs.getString("parent");
 				String childId  = rs.getString("child");
-				rawFamilyList.add(new CommitFamily(parentId, childId));
+				if(familyMap.containsKey(childId))
+				{
+					familyMap.get(childId).add(parentId);
+				}
+				else
+				{
+					List<String> parentList = new ArrayList<String>();
+					parentList.add(parentId);
+					familyMap.put(childId, parentList);
+				}
 			}
 
 			// Get a random path from this commit to Root
-			// List must be ordered from newest to oldest
 			String currentChild = commitID;
-			// MAGICAL LOOP OF GOODNESS - DO NOT DELETE ADRIAN!!!!
-			// IT'S POWERS ARE KNOWN FAR AND WIDE
-			for(CommitFamily family : rawFamilyList)
+			while(familyMap.containsKey(currentChild))
 			{
-				// Look for its parent
-				for(CommitFamily secondFamily : rawFamilyList)
-				{
-					if(secondFamily.getChildId().equals(currentChild))
-					{
-						familyList.add(new CommitFamily(secondFamily.getParentId(), secondFamily.getChildId()));
-						currentChild = secondFamily.getParentId();
-						break;
-					}
-				}
+				String parentId = familyMap.get(currentChild).get(0);
+				familyList.add(new CommitFamily(parentId, currentChild));
+				currentChild = parentId;
 			}
 
 			return familyList;
