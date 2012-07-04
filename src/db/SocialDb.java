@@ -127,20 +127,6 @@ public class SocialDb extends DbConnection
 	}
 	
 	/**
-	 * Insert a list of people to people table.
-	 * @param people
-	 * @return List of people Id
-	 */
-	public List<Integer> insertPeople(List<Person> people) {
-		List<Integer> inserts = new ArrayList<Integer>();
-		for(Person person: people) {
-			if (person.getEmail() != null && person.getName() != null)
-				inserts.add(insertPerson(person));
-		}
-		return inserts;
-	}
-	
-	/**
 	 * Insert a thread into Threads table
 	 * @param thread
 	 * @return true if succeed. Exception throw if not

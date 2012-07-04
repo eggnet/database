@@ -149,35 +149,6 @@ public class TechnicalDb extends DbConnection
 	}
 	
 	/***
-	 * Get the time stamp associated with the given commit id. It tells when the commit was committed.
-	 * The commit is searched on the main Branch ID.
-	 * @param commit_id
-	 * @return timestamp as string, empty string if not found.
-	 */
-	public String getTimeStamp(String commit_id)
-	{
-		try {
-			String query = "SELECT commit_date from commits where commit_id =? and (branch_id=? or branch_id is NULL);";
-			ISetter[] params = {new StringSetter(1,commit_id),
-								new StringSetter(2,this.branchID)};
-			
-			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(query, params);
-			addExecutionItem(ei);
-			ei.waitUntilExecuted();
-			ResultSet rs = ei.getResult();
-			if(rs.next())
-				return rs.getString(1);
-			else
-				return "";
-		}
-		catch(SQLException e)
-		{
-			e.printStackTrace();
-			return null;
-		}
-	}
-	
-	/***
 	 * Help function to find the list of diffs for a file. Given the two commit id and the file name. 
 	 * @param comFam contains the two commit id
 	 * @param comDiffs contains a list of all the commit diffs
@@ -856,88 +827,12 @@ public class TechnicalDb extends DbConnection
 			return null;
 		}
 	}
-	
-	/**
-	 * Checks whether or not a commit is included in the owners table
-	 * @param CommitId
-	 * @return true or false
-	 */
-	public boolean isCommitInOwners(String CommitId) 
-	{
-		try
-		{
-			String sql = "SELECT commit_id from owners where commit_id=?;";
-			ISetter[] parms = {new StringSetter(1, CommitId)};
-					
-			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, parms);
-			addExecutionItem(ei);
-			ei.waitUntilExecuted();
-			ResultSet rs = ei.getResult();
-			if (rs.next())
-				return true;
-			else
-				return false;
-		}
-		catch (SQLException e)
-		{
-			e.printStackTrace();
-			return false;
-		}
-	}
-	
 
 	/**
-	 * Gets the latest commit in the owners table.
-	 * @return CommitID
+	 * Get commit from commitId
+	 * @param CommitId
+	 * @return Commit. Throw exception ow
 	 */
-	public String getLastOwnerCommit() 
-	{
-		try 
-		{
-			String sql = "Select commit_id from owners natural join commits order by id desc;";
-			ISetter[] parms = {};
-			
-			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, parms);
-			addExecutionItem(ei);
-			ei.waitUntilExecuted();
-			ResultSet rs = ei.getResult();
-			
-			if (rs.next())
-				return rs.getString(1);
-			else
-				return null;
-		}
-		catch(SQLException e)
-		{
-			e.printStackTrace();
-			return null;
-		}
-	}
-	/**
-	 * Gets the latest commit in the commits table
-	 * @return CommitID 
-	 */
-	public String getLastCommit() 
-	{
-		try 
-		{
-			String sql = "Select commit_id from commits order by id desc;";
-			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, null);
-			this.addExecutionItem(ei);
-			ei.waitUntilExecuted();
-			ResultSet rs = ei.getResult();
-			if (rs.next())
-				return rs.getString(1);
-			else
-				return null;
-		}
-		catch(SQLException e)
-		{
-			e.printStackTrace();
-			return null;
-		}
-	}
-	
 	public Commit getCommit(String CommitId)
 	{
 		String sql = "SELECT commit_id, author, author_email, comments, commit_date, branch_id FROM Commits where commit_id=? and (branch_id=? or branch_id is NULL);";
@@ -945,59 +840,6 @@ public class TechnicalDb extends DbConnection
 		PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, params);
 		this.addExecutionItem(ei);
 		return new Commit(ei);
-	}
-	
-	public Change getOwnerChangeBefore(String FileId, int CharStart, Timestamp CommitDate)
-	{
-		String sql = "SELECT commit_id, file_id, owner_id, char_start, char_end, change_type FROM owners natural join commits where file_id=? and commit_id=?" +
-				"and char_start='" + CharStart + "' and (branch_id=? OR branch_id is NULL) and commit_date < "+ CommitDate + " order by id desc";
-		ISetter[] params = {new StringSetter(1,FileId), new StringSetter(2,branchID)};
-		PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, params);
-		this.addExecutionItem(ei);
-		return new Change(ei);
-	}
-		
-	public Change getLatestOwnerChange(String fileId, int start, int end, Timestamp commitDate)
-	{
-		String sql = "SELECT commit_id, file_id, owner_id, char_start, char_end, change_type FROM owners natural join commits where file_id=? AND commit_date < ? AND "
-				+ "(branch_id=? OR branch_id is NULL) order by id desc";
-		ISetter[] params = {new StringSetter(1,fileId), new TimestampSetter(2, commitDate), new StringSetter(3, branchID)};
-		PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, params);
-		this.addExecutionItem(ei);
-		return new Change(ei);
-	}
-	
-	/**
-	 * Get all the changed files from new commit to old commit 
-	 * @param oldCommit
-	 * @param newCommit
-	 * @return List of file name, NULL ow
-	 */
-	public List<String> getFilesChangedForParentChildCommit(String oldCommit, String newCommit) {
-		try 
-		{
-			LinkedList<String> files = new LinkedList<String>();
-			String sql = "SELECT file_id FROM file_diffs " +
-					"WHERE old_commit_id=? AND new_commit_id=?"; 
-			
-			ISetter[] params = {new StringSetter(1,oldCommit), new StringSetter(2,newCommit)};
-			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, params);
-			addExecutionItem(ei);
-			ei.waitUntilExecuted();
-			ResultSet rs = ei.getResult();
-			
-			while(rs.next())
-			{
-				if(!files.contains(rs.getString("file_id")))
-					files.add(rs.getString("file_id"));
-			}
-			return files;
-		}
-		catch(SQLException e) 
-		{
-			e.printStackTrace();
-			return null;
-		}
 	}
 	
 	/**
@@ -1128,30 +970,6 @@ public class TechnicalDb extends DbConnection
 	}
 	
 	/**
-	 * @infiro REDUNDANT to be removed
-	 * @param commit
-	 * @return
-	 */
-	public List<String> getFilesPathChangedOnCommit(Commit commit) {
-		try {
-			List<String> files = new ArrayList<String>();
-			String sql = "SELECT distinct file_id FROM file_diffs WHERE" +
-					" new_commit_id=?";
-			String[] parms = {commit.getCommit_id()};
-			ResultSet rs = execPreparedQuery(sql, parms);
-			while(rs.next())
-			{
-				files.add(rs.getString("file_id"));
-			}
-			return files;
-		}
-		catch(SQLException e) {
-			e.printStackTrace();
-			return null;
-		}
-	}
-
-	/**
 	 * Get User that created the given commit
 	 * @param CommitId
 	 * @return User, Null if there is none or exception
@@ -1219,59 +1037,6 @@ public class TechnicalDb extends DbConnection
 	}
 	
 	/**
-	 * Check if this commit exists in file cache table
-	 * @param commitID
-	 * @return true if it is a cache, false ow
-	 */
-	public boolean isCacheCommit(String commitID) {
-		try {
-			String sql = "SELECT count(*) FROM file_caches WHERE commit_id=?";
-			ISetter[] params = {new StringSetter(1,commitID)};
-			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, params);
-			addExecutionItem(ei);
-			ei.waitUntilExecuted();
-			ResultSet rs = ei.getResult();
-			if(rs.next())
-				return rs.getInt("count") > 0;
-				
-			return false;
-		}
-		catch (SQLException e)
-		{
-			e.printStackTrace();
-			return false;
-		}
-	}
-	
-	/**
-	 * Get the name of the user, given the user email (UserId)
-	 * @param UserId
-	 * @param NetworkId
-	 * @return Name of the author, Null ow
-	 */
-	public String getUserFullName(String UserId, int NetworkId)
-	{
-		try
-		{
-			String sql = "SELECT author from commits where author_email=?;";
-			ISetter[] params = {new StringSetter(1,UserId)};
-			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, params);
-			addExecutionItem(ei);
-			ei.waitUntilExecuted();
-			ResultSet rs = ei.getResult();
-			if(!rs.next())
-				return null;
-			else
-				return rs.getString("author");
-		}
-		catch(SQLException e)
-		{
-			e.printStackTrace();
-			return null;
-		}
-	}
-	
-	/**
 	 * Get a list of parent commits of a given commit
 	 * @param CommitID
 	 * @return List of parent commit, Empty if none found, NUll if exception
@@ -1305,10 +1070,10 @@ public class TechnicalDb extends DbConnection
 	}
 	
 	/**
-	 * @infiro REDUNDANT to be removed
+	 * Get file changes from an old commit to new commit
 	 * @param oldCommit
 	 * @param newCommit
-	 * @return
+	 * @return list of file name, empty if none found, null if there is exception
 	 */
 	public List<String> getFilesChanged(String oldCommit, String newCommit) {
 		try 
@@ -1316,8 +1081,13 @@ public class TechnicalDb extends DbConnection
 			LinkedList<String> files = new LinkedList<String>();
 			String sql = "SELECT file_id FROM file_diffs " +
 					"WHERE old_commit_id=? AND new_commit_id=?"; 
-			String[] parms = {oldCommit, newCommit};
-			ResultSet rs = execPreparedQuery(sql, parms);
+			
+			ISetter[] params = {new StringSetter(1,oldCommit), new StringSetter(2,newCommit)};
+			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, params);
+			addExecutionItem(ei);
+			ei.waitUntilExecuted();
+			ResultSet rs = ei.getResult();
+			
 			while(rs.next())
 			{
 				if(!files.contains(rs.getString("file_id")))
@@ -1426,38 +1196,6 @@ public class TechnicalDb extends DbConnection
 		}
 	}
 
-	/**
-	 * Get a list of children commits for a given commit
-	 * @param CommitID
-	 * @return List of commits, empty if none found, NULL if exception
-	 */
-	public List<Commit> getCommitChildren(String CommitID) {
-		try 
-		{
-			LinkedList<Commit> commits = new LinkedList<Commit>();
-			String sql = "SELECT commit_id, author, author_email, comments, commit_date, branch_id FROM commit_family " +
-					"JOIN Commits ON (commit_family.child = Commits.commit_id) where parent=?" +
-					"and (branch_id is NULL OR branch_id=?) order by commit_date, commit_id;"; 
-			
-			ISetter[] params = {new StringSetter(1,CommitID), new StringSetter(2,branchID)};
-			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, params);
-			addExecutionItem(ei);
-			ei.waitUntilExecuted();
-			ResultSet rs = ei.getResult();
-			while(rs.next())
-			{
-				commits.add(new Commit(rs.getString(1), rs.getString(2),
-						rs.getString(3), rs.getString(4), rs.getTimestamp(5), rs.getString(6)));
-			}
-			return commits;
-		}
-		catch(SQLException e) 
-		{
-			e.printStackTrace();
-			return null;
-		}
-	}
-	
 	/**
 	 * Get a Map of all the ownership for a file happened before a commit (including this commit)
 	 * Any commit that changed this file will be added to this map
