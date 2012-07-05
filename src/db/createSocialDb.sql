@@ -102,3 +102,12 @@ CREATE TABLE links (
 	confidence real NOT NULL,
 	PRIMARY KEY(item_id, commit_id)
 );
+	
+CREATE TABLE patterns ( 
+	p_id1 varchar(255),
+	p_id2 varchar(255),
+	type varchar(255),
+	passed integer,
+	failed integer,
+	PRIMARY KEY(p_id1, p_id2, type)
+);
