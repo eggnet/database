@@ -111,3 +111,14 @@ CREATE TABLE patterns (
 	failed integer,
 	PRIMARY KEY(p_id1, p_id2, type)
 );
+
+CREATE TABLE commit_patterns ( 
+	commit_id varchar(255),
+	p_id1 varchar(255),
+	p_id2 varchar(255),
+	type varchar(255),
+	social_weight real,
+	technical_weight real,
+	technical_weight_fuzzy real,
+	PRIMARY KEY(p_id1, p_id2, commit_id)
+);

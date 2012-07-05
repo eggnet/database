@@ -503,6 +503,35 @@ public class SocialDb extends DbConnection
 	}
 	
 	/**
+	 * Get a list of Link that are associated with this issue
+	 * @param issue
+	 * @return
+	 */
+	public List<Link> getLinksFromIssue(Issue issue) {
+		try {
+			List<Link> links = new ArrayList<Link>();
+			String sql = "SELECT * FROM links WHERE item_id = " + issue.getItemID();
+			
+			ISetter[] params = {};
+			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, params);
+			addExecutionItem(ei);
+			ei.waitUntilExecuted();
+			ResultSet rs = ei.getResult();
+			
+			while(rs.next())
+			{
+				links.add(new Link(rs.getInt("item_id"),rs.getString("commit_id"),rs.getFloat("confidence")));
+			}
+			
+			return links;
+		}
+		catch(SQLException e) {
+			e.printStackTrace();
+			return null;
+		}
+	}
+	
+	/**
 	 * Delete All Links in links table
 	 */
 	public void deleteLinks() {
