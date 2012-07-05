@@ -26,7 +26,6 @@ import db.util.ISetter;
 import db.util.PreparedStatementExecutionItem;
 import db.util.ISetter.IntSetter;
 import db.util.ISetter.StringSetter;
-import db.util.ISetter.TimestampSetter;
 
 public class TechnicalDb extends DbConnection
 {
@@ -1094,6 +1093,38 @@ public class TechnicalDb extends DbConnection
 		}
 		catch(SQLException e) 
 		{
+			e.printStackTrace();
+			return null;
+		}
+	}
+	
+	/**
+	 * Get a list of Diff object for a given commitId and file id
+	 * @param commitID
+	 * @param file
+	 * @return list of DiffEntry. Empty if none found. Null if there is exception
+	 */
+	public List<DiffEntry> getDiffsFromCommitAndFile(String commitID, String file) {
+		try {
+			List<DiffEntry> diffs = new ArrayList<DiffEntry>();
+			String sql = "SELECT * FROM file_diffs WHERE file_id=? AND new_commit_id=?";
+			
+			ISetter[] params = {new StringSetter(1,file), new StringSetter(2,commitID)};
+			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, params);
+			addExecutionItem(ei);
+			ei.waitUntilExecuted();
+			ResultSet rs = ei.getResult();
+			
+			while(rs.next())
+			{
+				diffs.add(new DiffEntry(file, commitID, rs.getString("old_commit_id"),
+						rs.getString("diff_text"), rs.getInt("char_start"), rs.getInt("char_end"), 
+						rs.getString("diff_type")));
+			}
+			
+			return diffs;
+		}
+		catch(SQLException e) {
 			e.printStackTrace();
 			return null;
 		}
