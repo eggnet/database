@@ -48,4 +48,10 @@ public class Person
 	{
 		this.email = email;
 	}
+	
+	@Override
+	public int hashCode()
+	{
+		return email.hashCode();
+	}
 }
