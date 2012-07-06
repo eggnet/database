@@ -37,14 +37,15 @@ public class SocialDb extends DbConnection
 	public boolean createDb(String dbName) {
 		try {
 			// Drop the DB if it already exists
-			String query = "DROP DATABASE IF EXISTS " + dbName + ";";
-			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(query, null);
+			String query = "DROP DATABASE IF EXISTS " + dbName;
+			ISetter[] parms = {};
+			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(query, parms);
 			addExecutionItem(ei);
 			ei.waitUntilExecuted();
 			
 			// First create the DB.
-			query = "CREATE DATABASE " + dbName + ";";
-			ei = new PreparedStatementExecutionItem(query, null);
+			query = "CREATE DATABASE " + dbName;
+			ei = new PreparedStatementExecutionItem(query, parms);
 			addExecutionItem(ei);
 			ei.waitUntilExecuted();
 			
