@@ -840,7 +840,7 @@ public class TechnicalDb extends DbConnection
 	
 	/**
 	 * Get a list of commits by a limit and an offset (where to start)
-	 * The maximum number of commit return is 100
+	 * The maximum number of commit return is {@code iLIMIT}
 	 * @param iLIMIT
 	 * @param iOFFSET
 	 * @return List of commits
@@ -854,11 +854,31 @@ public class TechnicalDb extends DbConnection
 		PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, params);
 		addExecutionItem(ei);
 		
-		for (int i = 0;i < 100;i++)
+		for (int i = 0;i < iLIMIT;i++)
 		{
 			commits.add(new Commit(ei));
 		}
 		return commits;
+	}
+	
+	public int getCommitCount() {
+		String sql = "SELECT COUNT(*) from commits;";
+		ISetter[] parms = {};
+		PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, parms);
+		addExecutionItem(ei);
+		ei.waitUntilExecuted();
+		try
+		{
+			if (ei.getResult().next())
+			{
+				return ei.getResult().getInt(1);
+			}
+		}
+		catch (SQLException e)
+		{
+			e.printStackTrace();
+		}
+		return -1;
 	}
 	
 	/**

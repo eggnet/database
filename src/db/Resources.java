@@ -8,7 +8,7 @@ public abstract class Resources {
 	public static final String dbUrl = "jdbc:postgresql://localhost:5432/";
 	public static final String EGGNET_DB_NAME = "eggnet";
 	public static final SimpleDateFormat DBDateFormat = new SimpleDateFormat("yyyy-mm-dd kk:mm:ss Z");
-	public static final int DB_LIMIT = 2000;
+	public static final int DB_LIMIT = 100;
 	public static final SimpleDateFormat JiraDateFormat = new SimpleDateFormat("yyyy-mm-dd kk:mm:ss.SSSZ");  
 
 	public enum ChangeType {
