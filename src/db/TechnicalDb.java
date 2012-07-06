@@ -848,7 +848,7 @@ public class TechnicalDb extends DbConnection
 	public List<Commit> getCommits(int iLIMIT, int iOFFSET) {
 		LinkedList<Commit> commits = new LinkedList<Commit>();
 		String sql = "SELECT * FROM commits " +
-					 "ORDER BY commit_date DESC " +
+					 "ORDER BY commit_date " +
 					 "LIMIT ? OFFSET ?"; 
 		ISetter[] params = {new IntSetter(1,iLIMIT), new IntSetter(2, iOFFSET)};
 		PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, params);
