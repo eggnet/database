@@ -54,4 +54,13 @@ public class Person
 	{
 		return email.hashCode();
 	}
+
+	@Override
+	public boolean equals(Object o) {
+		Person p = (Person) o;
+		if(this.email.equals(p.email) && this.name.equals(p.name) && this.PID == p.PID)
+			return true;
+		else
+			return false;
+	}
 }
