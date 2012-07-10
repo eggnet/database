@@ -1361,12 +1361,12 @@ public class TechnicalDb extends DbConnection
 			this.addExecutionItem(ei);
 			ei.waitUntilExecuted();
 			if(ei.getResult().next())
-				return true;
+				return false;
 		}
 		catch (SQLException e)
 		{
 			e.printStackTrace();
 		}
-		return false;
+		return true;
 	}
 }
