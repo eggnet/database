@@ -841,6 +841,7 @@ public class TechnicalDb extends DbConnection
 	/**
 	 * Get a list of commits by a limit and an offset (where to start)
 	 * The maximum number of commit return is {@code iLIMIT}
+	 * @see DOES NOT RETURN IN ANY LOGICAL ORDER (ORDER BY COMMIT_ID)
 	 * @param iLIMIT
 	 * @param iOFFSET
 	 * @return List of commits
@@ -848,7 +849,7 @@ public class TechnicalDb extends DbConnection
 	public List<Commit> getCommits(int iLIMIT, int iOFFSET) {
 		LinkedList<Commit> commits = new LinkedList<Commit>();
 		String sql = "SELECT * FROM commits " +
-					 "ORDER BY commit_date " +
+					 "ORDER BY commit_id " +
 					 "LIMIT ? OFFSET ?"; 
 		ISetter[] params = {new IntSetter(1,iLIMIT), new IntSetter(2, iOFFSET)};
 		PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, params);
