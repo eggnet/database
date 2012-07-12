@@ -25,6 +25,7 @@ import models.DiffEntry.diff_types;
 import db.util.ISetter;
 import db.util.PreparedStatementExecutionItem;
 import db.util.ISetter.IntSetter;
+import db.util.ISetter.TimestampSetter;
 import db.util.ISetter.StringSetter;
 
 public class TechnicalDb extends DbConnection
@@ -899,7 +900,7 @@ public class TechnicalDb extends DbConnection
 			dateAfter.setTime(date.getTime() + 3600 * 1000 * 24 * 7);
 			date.setTime(date.getTime() - 3600 * 1000 * 24 * 7);
 			
-			ISetter[] params = {new StringSetter(1,branchID), new StringSetter(2, date.toString()), new StringSetter(3, dateAfter.toString())};
+			ISetter[] params = {new StringSetter(1,branchID), new TimestampSetter(2, date), new TimestampSetter(3, dateAfter)};
 			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, params);
 			addExecutionItem(ei);
 			ei.waitUntilExecuted();

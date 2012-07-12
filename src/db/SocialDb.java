@@ -165,6 +165,7 @@ public class SocialDb extends DbConnection
 					ISetter[] parms2 = {new FloatSetter(1, link.getConfidence()), new IntSetter(2, link.getItemID()), new StringSetter(3, link.getCommitID())};
 					ei = new PreparedStatementExecutionItem(query, parms2);
 					addExecutionItem(ei);
+					ei.waitUntilExecuted();
 				}
 			}
 			else 
