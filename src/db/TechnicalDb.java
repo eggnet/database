@@ -887,9 +887,9 @@ public class TechnicalDb extends DbConnection
 	 * Get a list of commits that happen within a week around a timestamp
 	 * Any commits happened a week before or after this timestamp will be returned
 	 * @param date
-	 * @return List of commits, NULL ow
+	 * @return List of commits, NULL on exception
 	 */
-	public List<Commit> getCommitsAroundDate(Timestamp date) {
+	public synchronized List<Commit> getCommitsAroundDate(Timestamp date) {
 		try {
 			List<Commit> commits = new ArrayList<Commit>();
 			

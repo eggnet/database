@@ -147,7 +147,7 @@ public class SocialDb extends DbConnection
 	 * @param link
 	 * @return true if succeed, false ow
 	 */
-	public boolean insertLink(Link link) {
+	public synchronized boolean insertLink(Link link) {
 		try {
 			// First check if a link exists. 
 			String query = "SELECT * from links where item_id=? and commit_id=?";
