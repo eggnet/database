@@ -441,13 +441,14 @@ public class SocialDb extends DbConnection
 	/**
 	 * Gets a list of all Non-Issue items
 	 * @return List of items, Null if there is exception
+	 * TODO @braden, make this paginate if we run into memory issues
 	 */
 	public List<Item> getAllItems()
 	{
 		List<Item> items = new ArrayList<Item>();
 		try
 		{
-			String sql = "SELECT p_id, item_date, item_id, body, title, type from items natural full join links where type != 'ISSUE';";
+			String sql = "SELECT p_id, item_date, item_id, body, title, type from items;";
 			ISetter[] params = {};
 			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, params);
 			addExecutionItem(ei);
