@@ -12,11 +12,11 @@ import db.Resources.CommType;
 
 /**
  * Stores the record of an Item of communication
- * {@link Thread}
- * {@link Email}
- * {@link Commit}
- * {@link IM}
- * {@link IRC}
+ * {@link models.Thread}
+ * {@link models.Email}
+ * {@link models.Commit}
+ * {@link models.IM}
+ * {@link models.IRC}
  * etc.
  * @author braden
  */

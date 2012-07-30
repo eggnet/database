@@ -478,7 +478,7 @@ public class SocialDb extends DbConnection
 	/**
 	 * Get a list of commit id that are associated with this issue
 	 * @param issue
-	 * @return
+	 * @return List of Commit ID's found in the issue's body.
 	 */
 	public List<String> getCommitIDForIssue(Issue issue) {
 		try 
@@ -508,7 +508,7 @@ public class SocialDb extends DbConnection
 	/**
 	 * Get a list of Link that are associated with this issue
 	 * @param issue
-	 * @return
+	 * @return List of {@link models.Commit} linked to the given {@link models.Issue}
 	 */
 	public List<Link> getLinksFromIssue(Issue issue) {
 		try {
