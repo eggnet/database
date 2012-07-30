@@ -896,11 +896,10 @@ public class TechnicalDb extends DbConnection
 			String sql = "SELECT commit_id, author, author_email, comments, commit_date, branch_id FROM commits WHERE" +
 					" (branch_id is NULL OR branch_id=?) AND" +
 					" commit_date >= ?::timestamp and commit_date <= ?::timestamp"; 
-			Timestamp dateAfter = new Timestamp(date.getTime());
-			dateAfter.setTime(date.getTime() + 3600 * 1000 * 24 * 7);
-			date.setTime(date.getTime() - 3600 * 1000 * 24 * 7);
+			Timestamp dateBefore = new Timestamp(date.getTime());
+			dateBefore.setTime(date.getTime() - 3600 * 1000 * 24 * 7);
 			
-			ISetter[] params = {new StringSetter(1,branchID), new TimestampSetter(2, date), new TimestampSetter(3, dateAfter)};
+			ISetter[] params = {new StringSetter(1,branchID), new TimestampSetter(3, dateBefore),new TimestampSetter(2, date)};
 			PreparedStatementExecutionItem ei = new PreparedStatementExecutionItem(sql, params);
 			addExecutionItem(ei);
 			ei.waitUntilExecuted();
